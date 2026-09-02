@@ -1,0 +1,12 @@
+@import 'tailwindcss';
+
+/* Tailwind v4: o tema e configurado em CSS, sem tailwind.config.js. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+}

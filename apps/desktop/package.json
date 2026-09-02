@@ -1,0 +1,19 @@
+{
+  "name": "desktop",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "dev:desktop": "tauri dev",
+    "package": "tauri build",
+    "clean": "rimraf src-tauri/target src-tauri/gen",
+    "android:init": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 init",
+    "android:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 dev",
+    "android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 build --apk",
+    "android:aab": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 build --aab"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "rimraf": "6.0.1"
+  }
+}

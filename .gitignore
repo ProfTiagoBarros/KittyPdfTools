@@ -1,0 +1,50 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Build
+.next/
+out/
+dist/
+build/
+.turbo/
+
+# Tauri / Rust
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/*
+# ...menos o projeto Android, que carrega customizacao deliberada: o manifesto sem a
+# permissao INTERNET. Se ele ficar de fora do versionamento, a barreira mais forte da
+# Regra de Ouro 1 volta sozinha ao padrao do Tauri na proxima geracao.
+!apps/desktop/src-tauri/gen/android/
+
+# Testes
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Ambiente
+.env
+.env.*
+!.env.example
+
+# Editor / SO
+.DS_Store
+Thumbs.db
+*.log
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# NUNCA versionar material sensivel usado em testes de assinatura ICP-Brasil
+*.pfx
+*.p12
+*.key
+*.pem
+
+# Asset gerado por prebuild (copiado de node_modules)
+apps/web/public/pdfjs/
+
+apps/web/public/tesseract/

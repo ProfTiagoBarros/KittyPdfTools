@@ -1,0 +1,56 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "PDFKitty",
+  "version": "0.1.0",
+  "identifier": "com.pdfkitty.app",
+  "build": {
+    "frontendDist": "../../web/out",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "pnpm --filter web dev",
+    "beforeBuildCommand": "pnpm --filter web build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "PDFKitty",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'unsafe-inline' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data:",
+        "worker-src": "'self' blob:",
+        "child-src": "'self' blob:",
+        "connect-src": "'self' ipc: http://ipc.localhost",
+        "object-src": "'none'",
+        "frame-ancestors": "'none'"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "PDFKitty",
+    "shortDescription": "Suite de PDF 100% local",
+    "longDescription": "Unir, dividir, ofuscar, assinar e reconhecer texto em PDFs sem enviar nada para servidores.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "minSdkVersion": 26
+    }
+  }
+}

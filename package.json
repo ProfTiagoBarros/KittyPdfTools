@@ -1,0 +1,33 @@
+{
+  "name": "pdfkitty",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Suite de manipulacao de PDF 100% client-side, com privacidade Zero-Data Transfer",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "clean": "turbo run clean && rimraf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml,css}\"",
+    "test:coverage": "turbo run test:coverage",
+    "verify:spike-excluded": "turbo run verify:spike-excluded"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.9.1",
+    "globals": "17.11.0",
+    "prettier": "3.9.6",
+    "rimraf": "6.0.1",
+    "turbo": "2.10.12",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.68.0"
+  }
+}
