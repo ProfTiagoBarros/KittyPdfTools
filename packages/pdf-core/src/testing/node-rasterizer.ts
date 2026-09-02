@@ -20,6 +20,7 @@ export async function createNodeRasterizer(pdf: Uint8Array): Promise<DisposableR
   return {
     async rasterize(request: RasterizeRequest): Promise<RasterPage> {
       const page = await loaded.doc.getPage(request.pageIndex + 1);
+      const format = request.format ?? 'png';
 
       // O viewport ja aplica a rotacao da pagina, entao a imagem sai sempre "em pe".
       const viewport = page.getViewport({ scale: request.scale });
@@ -44,7 +45,12 @@ export async function createNodeRasterizer(pdf: Uint8Array): Promise<DisposableR
       paintBlackout(context, viewport, request.blackout);
 
       return {
-        png: new Uint8Array(canvas.toBuffer('image/png')),
+        image: new Uint8Array(
+          format === 'jpeg'
+            ? canvas.toBuffer('image/jpeg', Math.round((request.quality ?? 0.7) * 100))
+            : canvas.toBuffer('image/png'),
+        ),
+        format,
         widthPt: unscaled.width,
         heightPt: unscaled.height,
         widthPx: canvas.width,

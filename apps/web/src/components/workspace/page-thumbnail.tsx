@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@/i18n';
 import { useWorkspaceServices } from '@/workspace/services';
+import { drawRotated } from '@/lib/draw-page';
 
 interface PageThumbnailProps {
   readonly documentId: string;
@@ -84,19 +85,9 @@ export function PageThumbnail({ documentId, pageIndex, rotate, fileName }: PageT
         const canvas = canvasRef.current;
         if (cancelled || canvas === null) return;
 
-        const quarterTurn = rotate === 90 || rotate === 270;
-        canvas.width = quarterTurn ? thumbnail.heightPx : thumbnail.widthPx;
-        canvas.height = quarterTurn ? thumbnail.widthPx : thumbnail.heightPx;
-
-        const context = canvas.getContext('2d');
-        if (context === null) throw new Error('sem contexto 2d no canvas da miniatura');
-
-        context.save();
-        context.translate(canvas.width / 2, canvas.height / 2);
-        context.rotate((rotate * Math.PI) / 180);
-        context.drawImage(thumbnail.bitmap, -thumbnail.widthPx / 2, -thumbnail.heightPx / 2);
-        context.restore();
-
+        // Mesmo desenho da visualizacao ampliada: se os dois divergirem, a pagina que o
+        // usuario inspeciona deixa de ser a que ele vai receber.
+        drawRotated(canvas, thumbnail, rotate);
         setStatus('ready');
       })
       .catch((cause: unknown) => {

@@ -50,7 +50,7 @@ interface TesseractBlock {
 
 export interface OcrEngine {
   recognizePage(
-    png: Uint8Array,
+    image: Uint8Array,
     pageIndex: number,
     imageWidthPx: number,
     imageHeightPx: number,

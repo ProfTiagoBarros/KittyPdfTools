@@ -1,8 +1,15 @@
 /// <reference lib="webworker" />
-import { addInvisibleTextLayer, redactByRasterizing, type OcrPageText } from 'pdf-core';
+import {
+  addInvisibleTextLayer,
+  compressByRasterizing,
+  compressToTarget,
+  redactByRasterizing,
+  repackLossless,
+  type OcrPageText,
+} from 'pdf-core';
 import { openForRendering, configurePdfjs, type DocumentRenderer } from 'pdf-core/browser';
 import { toErrorPayload, toTransferable } from './messages';
-import type { RenderRequest, RenderResponse } from './render-protocol';
+import type { CompressRequest, RenderRequest, RenderResponse } from './render-protocol';
 import { createOcrEngine, OCR_SCALE } from './ocr';
 
 /**
@@ -111,6 +118,11 @@ async function handle(request: RenderRequest): Promise<void> {
         return;
       }
 
+      case 'compress': {
+        await runCompress(request);
+        return;
+      }
+
       case 'ocr': {
         await runOcr(request);
         return;
@@ -140,6 +152,88 @@ async function handle(request: RenderRequest): Promise<void> {
  * na pagina atual. Sem a segunda parte, a barra ficaria parada por dezenas de segundos numa
  * pagina densa — que e exatamente quando o usuario mais precisa saber que algo acontece.
  */
+/**
+ * Compacta a composicao ja montada.
+ *
+ * O documento e aberto so aqui e descartado no `finally`: manter mais um documento do pdf.js
+ * vivo por engano custa memoria que o celular nao tem sobrando, e o rasterizador so faz
+ * sentido enquanto esta compressao dura.
+ */
+async function runCompress(request: CompressRequest): Promise<void> {
+  const bytes = new Uint8Array(request.pdf);
+  const relatarProgresso = (completed: number, total: number) =>
+    reply({ kind: 'progress', id: request.id, completed, total });
+
+  if (request.mode.kind === 'lossless') {
+    // Sem rasterizacao nao ha rasterizador a abrir: e so pdf-lib.
+    const resultado = await repackLossless(bytes, {
+      removeInvisibleText: request.mode.removeInvisibleText,
+      onProgress: relatarProgresso,
+    });
+    const pdf = toTransferable(resultado.pdf);
+    reply(
+      {
+        kind: 'compressed',
+        id: request.id,
+        pdf,
+        originalBytes: bytes.length,
+        invisibleBlocksRemoved: resultado.invisibleBlocksRemoved,
+        fitsTarget: true,
+        step: null,
+        attempts: 1,
+      },
+      [pdf],
+    );
+    return;
+  }
+
+  const renderer = await openForRendering(bytes);
+  try {
+    if (request.mode.kind === 'quality') {
+      const comprimido = await compressByRasterizing(bytes, renderer, {
+        ...request.mode.step,
+        onProgress: relatarProgresso,
+      });
+      const pdf = toTransferable(comprimido);
+      reply(
+        {
+          kind: 'compressed',
+          id: request.id,
+          pdf,
+          originalBytes: bytes.length,
+          invisibleBlocksRemoved: 0,
+          fitsTarget: true,
+          step: request.mode.step,
+          attempts: 1,
+        },
+        [pdf],
+      );
+      return;
+    }
+
+    const resultado = await compressToTarget(bytes, renderer, {
+      maxBytes: request.mode.maxBytes,
+      onProgress: relatarProgresso,
+    });
+    const pdf = toTransferable(resultado.pdf);
+    reply(
+      {
+        kind: 'compressed',
+        id: request.id,
+        pdf,
+        originalBytes: bytes.length,
+        invisibleBlocksRemoved: 0,
+        fitsTarget: resultado.fitsTarget,
+        step: resultado.step,
+        attempts: resultado.attempts,
+      },
+      [pdf],
+    );
+  } finally {
+    await renderer.dispose();
+  }
+}
+
 async function runOcr(request: Extract<RenderRequest, { kind: 'ocr' }>): Promise<void> {
   const open = requireDocument(request.documentId);
   const targets =
@@ -181,7 +275,7 @@ async function runOcr(request: Extract<RenderRequest, { kind: 'ocr' }>): Promise
         blackout: [],
       });
       results.push(
-        await engine.recognizePage(raster.png, pageIndex, raster.widthPx, raster.heightPx),
+        await engine.recognizePage(raster.image, pageIndex, raster.widthPx, raster.heightPx),
       );
       recognized.push(pageIndex);
       done += 1;

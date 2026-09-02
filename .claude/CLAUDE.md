@@ -38,21 +38,22 @@ rodam em workers dedicados. Mensagens tipadas, nunca `any`. Toda operação long
 
 ## Decisões de arquitetura
 
-| Área          | Decisão                                         | Motivo                                                           |
-| ------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
-| Framework     | Next.js 16, App Router, `output: 'export'`      | Export estático elimina superfície de servidor                   |
-| Monorepo      | pnpm workspaces + Turborepo                     | Núcleo compartilhado entre web e desktop                         |
-| Testes        | Vitest + Testing Library + Playwright           | Playwright é o único caminho para Worker+WASM reais              |
-| Estado        | Zustand                                         | Baixo acoplamento, sem provider hell                             |
-| Drag & drop   | `@dnd-kit/core`                                 | Decisão do projeto (o documento citava alternativa)              |
-| UI            | Tailwind + Shadcn (Radix)                       | Design clean exigido pelo documento                              |
-| `node-linker` | `isolated` (padrão pnpm)                        | Impede import de dependência não declarada                       |
-| Base PDF      | `@cantoo/pdf-lib`                               | Fork MIT ativo; upstream parado desde 2022-05; expõe `encrypt()` |
-| Renderização  | `pdfjs-dist`                                    | Miniaturas e geometria do texto                                  |
-| Ofuscação     | Implementação própria                           | MuPDF é AGPL-3.0: exigiria abrir o produto ou licença comercial  |
-| Assinatura    | `@signpdf` + `signer-p12` + `placeholder-plain` | **Nunca `placeholder-pdf-lib`**: depende do pdf-lib abandonado   |
-| Empacotar     | ZIP via `fflate`, `level: 0`                    | PDF já é comprimido; o ZIP agrupa, não encolhe                   |
-| TypeScript    | `5.9.3` (pinado)                                | `latest` é o 7.x (port nativo)                                   |
+| Área          | Decisão                                         | Motivo                                                                  |
+| ------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Framework     | Next.js 16, App Router, `output: 'export'`      | Export estático elimina superfície de servidor                          |
+| Monorepo      | pnpm workspaces + Turborepo                     | Núcleo compartilhado entre web e desktop                                |
+| Testes        | Vitest + Testing Library + Playwright           | Playwright é o único caminho para Worker+WASM reais                     |
+| Estado        | Zustand                                         | Baixo acoplamento, sem provider hell                                    |
+| Drag & drop   | `@dnd-kit/core`                                 | Decisão do projeto (o documento citava alternativa)                     |
+| UI            | Tailwind + Shadcn (Radix)                       | Design clean exigido pelo documento                                     |
+| `node-linker` | `isolated` (padrão pnpm)                        | Impede import de dependência não declarada                              |
+| Base PDF      | `@cantoo/pdf-lib`                               | Fork MIT ativo; upstream parado desde 2022-05; expõe `encrypt()`        |
+| Compactar     | JPEG ao rasterizar; PNG ao ofuscar              | Página digitalizada é fotografia; ofuscação é prova e não pode degradar |
+| Renderização  | `pdfjs-dist`                                    | Miniaturas e geometria do texto                                         |
+| Ofuscação     | Implementação própria                           | MuPDF é AGPL-3.0: exigiria abrir o produto ou licença comercial         |
+| Assinatura    | `@signpdf` + `signer-p12` + `placeholder-plain` | **Nunca `placeholder-pdf-lib`**: depende do pdf-lib abandonado          |
+| Empacotar     | ZIP via `fflate`, `level: 0`                    | PDF já é comprimido; o ZIP agrupa, não encolhe                          |
+| TypeScript    | `5.9.3` (pinado)                                | `latest` é o 7.x (port nativo)                                          |
 
 **Plataformas-alvo:** Windows e Android. **Apple adiada por falta de aparelho, não por defeito** —
 Safari 16.4+ tem `OffscreenCanvas` inclusive em worker. Nada precisa ser reescrito para incluí-la;
@@ -68,7 +69,7 @@ publicação na Play ele não pode mudar. `minSdk` **26**, definido em `bundle.a
 
 ```
 apps/web/           Next.js 16 (export estático)
-  src/app/          rota por ferramenta: /unir /dividir /extrair /ocr /assinar /ofuscar
+  src/app/          rota por ferramenta: /unir /extrair /dividir /compactar /ocr /assinar /ofuscar
   src/components/   ui/ (primitivas) + workspace/ (casca, grade, painel, barra)
   src/workspace/    modelo puro, store Zustand, provedor dos workers, busca
   src/workers/      envelope comum + documentos + renderização + assinatura
@@ -78,7 +79,7 @@ apps/web/           Next.js 16 (export estático)
 apps/desktop/       Tauri v2 (Windows + Android); sem lógica de PDF
   plugins/saf-save/ plugin próprio de gravação (Rust + Kotlin)
 packages/pdf-core/  Lógica de PDF pura, sem React e sem DOM
-  src/composition/ src/split/ src/ocr/ src/redaction/ src/verification/
+  src/composition/ src/split/ src/compression/ src/ocr/ src/redaction/ src/verification/
   src/browser/      rasterizador OffscreenCanvas + adaptadores
   src/testing/      rasterizador Node
 tools/              diagnóstico de motor, fora do produto
@@ -144,6 +145,17 @@ acontecem na mesma mensagem (`splitComposition`).
 **OCR (US-04).** O `pdf-core` não conhece Tesseract: expõe `addInvisibleTextLayer` (modo de
 renderização 3). O reconhecimento vive em `workers/ocr.ts`; o motor é criado sob demanda (~15 MB).
 
+**Compactar (US-07).** Duas vias, porque são dois problemas. **Sem perda**
+(`repackLossless`): reempacota com fluxos de objetos e, se pedido, remove a camada de texto do
+OCR — a página não muda na tela. **Forte** (`compressByRasterizing`): rasteriza em **JPEG** e é o
+único caminho que encolhe um documento digitalizado de verdade; perde texto pesquisável, e por
+isso **confirma antes**. `compressToTarget` busca em **binária** sobre `COMPRESSION_STEPS` a maior
+qualidade que cabe num limite — motivado por sistemas como o SEI; cada tentativa gera o documento
+inteiro, então sete degraus custam três tentativas. Não coube nem no degrau mais agressivo? Devolve
+o menor com `fitsTarget: false`, em vez de erro. Remover a camada de OCR usa um **tokenizador** de
+content stream (`stripInvisibleText`), nunca expressão regular — `BT`, `ET` e `3 Tr` aparecem
+dentro de strings literais e de imagens embutidas. **Na dúvida, preserva.**
+
 **Ofuscação (US-03).** Rasteriza a página afetada já sem o conteúdo; as demais ficam intactas e
 pesquisáveis. **Retângulo preto não é redaction** — há controle negativo que reprova a ofuscação
 falsa. Região marcada em pixels, guardada em espaço de usuário do PDF. A confirmação diz as duas
@@ -188,6 +200,16 @@ um visualizador de página única). **O provedor de serviços fica fora da casca
 **Os workers são da sessão, não da rota.** Trocar de ferramenta preserva arquivos e miniaturas —
 antes destruía os workers e a grade ficava listando páginas sem bytes. Não há confirmação ao
 trocar: a tela foi desenhada em volta de **uma** montagem com cinco ferramentas na lateral.
+
+**Lupa em toda página** (`PagePreview`, US-08). A miniatura da grade não responde "que página é
+esta?" — o administrador da escola ordenava um documento longo, gerava o PDF, conferia e voltava
+para corrigir. A lupa abre a página a **1400 px** (legível, não impressa; o worker guarda por
+tamanho), **navega** entre páginas (setas, `Esc` fecha) e traz **mover e girar**, fechando o ciclo
+sem voltar à grade. Segue a **chave** do item, nunca a posição: seguindo a posição, ela saltaria
+para a vizinha no instante em que o usuário move a página que está olhando. O estado de desenho é
+**derivado** de `chave:rotação`, não um sinalizador — senão o desenho anterior fica na tela marcado
+como pronto enquanto o novo carrega, e a lupa mostra a página errada. `drawRotated` é
+compartilhado com a miniatura: se divergirem, a página inspecionada deixa de ser a que sai no PDF.
 
 **Miniaturas sob demanda e nunca vazias.** `IntersectionObserver` adia o pedido; onde não há
 imagem aparece uma folha em branco com **arquivo de origem e página naquele arquivo**. O canvas
@@ -251,12 +273,23 @@ activities` continua listando o `documentsui` na pilha, e o relatório acusava s
   logo abaixo de um arquivo gravado corretamente.
 - Bypass de CSP por CDP **vaza entre execuções**: desligue ao terminar e reinicie o app antes de
   medir.
+- **Compactar pode aumentar o arquivo.** Rasterizar página de texto vetorial produz a foto de
+  uma página quase em branco: medido no aparelho, 2 kB viraram 9 kB enquanto a tela dizia "0%
+  menor". A via forte é para documento digitalizado; quando o resultado cresce, a tela avisa e
+  aponta a via sem perda. Um teste chamado "produz um PDF menor" passou 5,7× maior por nunca
+  ter olhado o tamanho.
 - Nunca deixe servidor manual na porta 4173: o Playwright o reaproveita **sem rebuildar**.
 - Daemons do Gradle seguram o canal de saída depois de terminar — confira o artefato em disco em
   vez de esperar o aviso da tarefa.
 
 **Código**
 
+- **pdf-lib grava todo objeto do contexto, alcançável ou não** — e `context.delete()` foi medido
+  sem efeito. Reescrever o `Contents` e apontar para um stream novo deixava o antigo no arquivo:
+  remover a camada de OCR fazia o PDF **crescer** 178 bytes. A saída é copiar as páginas para um
+  documento novo (`copyPages`), que só carrega o alcançável — ao custo de marcadores e links.
+- `pushOperators` embrulha cada palavra num par `q`/`Q`. Podar só o `BT ... ET` deixa os pares
+  órfãos: 1.200 bytes por página de 300 palavras.
 - `pdf-core`: imports relativos **sem** extensão (o Vitest reescreve, o Turbopack não).
 - Cancelamento cooperativo exige ceder o laço de eventos (`MessageChannel`, não `setTimeout`).
 - Pastas iniciadas por `_` são privadas no App Router e nunca viram rota.

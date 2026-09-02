@@ -72,7 +72,9 @@ export async function redactByRasterizing(
     }
 
     const raster = await rasterizer.rasterize({ pageIndex, scale, blackout });
-    const image = await output.embedPng(raster.png);
+    // Ofuscar rasteriza SEM perda de proposito: o resultado costuma ser prova, e artefato
+    // de compressao em cima de um documento ofuscado seria degradar o que sobrou.
+    const image = await output.embedPng(raster.image);
     const page = output.addPage([raster.widthPt, raster.heightPt]);
     page.drawImage(image, { x: 0, y: 0, width: raster.widthPt, height: raster.heightPt });
 

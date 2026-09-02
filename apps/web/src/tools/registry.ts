@@ -13,8 +13,9 @@ export interface ToolDefinition {
  */
 export const TOOLS = [
   { slug: 'unir', nameKey: 'tool.merge.name', descriptionKey: 'tool.merge.description' },
-  { slug: 'dividir', nameKey: 'tool.split.name', descriptionKey: 'tool.split.description' },
   { slug: 'extrair', nameKey: 'tool.extract.name', descriptionKey: 'tool.extract.description' },
+  { slug: 'dividir', nameKey: 'tool.split.name', descriptionKey: 'tool.split.description' },
+  { slug: 'compactar', nameKey: 'tool.compress.name', descriptionKey: 'tool.compress.description' },
   { slug: 'ocr', nameKey: 'tool.ocr.name', descriptionKey: 'tool.ocr.description' },
   { slug: 'assinar', nameKey: 'tool.sign.name', descriptionKey: 'tool.sign.description' },
   { slug: 'ofuscar', nameKey: 'tool.redact.name', descriptionKey: 'tool.redact.description' },

@@ -664,6 +664,106 @@ if (salvoDividir.bytes !== null) {
 }
 salvoDividir.remover();
 
+// --- COMPACTAR --------------------------------------------------------------
+//
+// Duas vias com contratos opostos, e o que as separa e o AVISO. A via sem perda executa
+// direto; a forte rasteriza e nao pode comecar sem confirmacao. O Playwright ja fixa essa
+// fronteira no Chromium — o que so o celular responde e se o `OffscreenCanvas` do WebView
+// aguenta rasterizar um documento inteiro e se o resultado chega ao disco pelo SAF.
+
+const cartoesCompactar = await abrirComPdf('/compactar/', 4);
+console.log('COMPACTAR:', `rota carregou, ${cartoesCompactar} cartao(oes) na grade`);
+
+/** Estado da tela de compactar, sem depender de texto traduzido. */
+const lerCompactar = () =>
+  page.evaluate(() => ({
+    modoSemPerda: document
+      .querySelector('[data-testid="compress-mode-lossless"]')
+      ?.getAttribute('aria-checked'),
+    avisoNaTela: document.querySelector('[data-testid="compress-confirm"]') !== null,
+    resultado: document.querySelector('[data-testid="compress-results"]')?.textContent ?? null,
+  }));
+
+// A via sem perda NAO pode abrir aviso: ela nao degrada nada, e um alerta desnecessario
+// treina o usuario a clicar em "confirmar" sem ler — inclusive quando importa.
+const antesSemPerda = await lerCompactar();
+const salvoSemPerda = await salvarPeloSeletor('pdfkitty-compactado.pdf', async () => {
+  await page.click('[data-testid="compress-run"]');
+  // Meio segundo e suficiente: o dialogo e sincrono ao clique, nao espera worker algum.
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const durante = await lerCompactar();
+  console.log(
+    'SEM PERDA:',
+    `modo inicial=${antesSemPerda.modoSemPerda}`,
+    durante.avisoNaTela ? '| AVISO APARECEU ONDE NAO DEVIA' : '| sem aviso, como esperado',
+  );
+});
+relatar('S/PERDA', salvoSemPerda, 'pdf');
+
+const depoisSemPerda = await lerCompactar();
+console.log('S/PERDA PAINEL:', depoisSemPerda.resultado ?? 'nao relatou antes/depois');
+
+if (salvoSemPerda.bytes !== null) {
+  // Sem perda tem de continuar pesquisavel: o PDF de teste tem texto, e ele precisa
+  // sobreviver. E o controle que separa "sem perda" de "forte".
+  const paginas = await contarPaginasDe(salvoSemPerda.caminho);
+  console.log(
+    'S/PERDA CONTEUDO:',
+    `${paginas} pagina(s)`,
+    paginas === '4' ? '— intacto' : '— ESPERAVA 4',
+  );
+}
+salvoSemPerda.remover();
+
+// A via forte: rasteriza no WebView e PRECISA avisar antes.
+await abrirComPdf('/compactar/', 4);
+await page.click('[data-testid="compress-mode-quality"]');
+await page.click('[data-testid="compress-preset-low"]');
+await page.click('[data-testid="compress-run"]');
+await new Promise((resolve) => setTimeout(resolve, 800));
+
+const comAviso = await lerCompactar();
+const textoAviso = await page.evaluate(
+  () => document.querySelector('[data-testid="compress-confirm"]')?.textContent ?? '',
+);
+console.log(
+  'FORTE AVISO:',
+  comAviso.avisoNaTela ? 'apareceu' : 'NAO APARECEU — a via forte comecaria sem avisar',
+  // Nao basta aparecer: precisa NOMEAR a perda, e nao so perguntar "tem certeza?".
+  /pesquisav/i.test(textoAviso) ? '| nomeia a perda de busca' : '| NAO diz o que se perde',
+  /OCR/.test(textoAviso) ? '| cita o OCR' : '| nao cita o OCR',
+);
+
+if (comAviso.avisoNaTela) {
+  const salvoForte = await salvarPeloSeletor('pdfkitty-compactado.pdf', () =>
+    page.click('[data-testid="compress-accept"]'),
+  );
+  relatar('FORTE  ', salvoForte, 'pdf');
+
+  const painelForte = await lerCompactar();
+  console.log('FORTE PAINEL:', painelForte.resultado ?? 'nao relatou antes/depois');
+
+  if (salvoForte.bytes !== null && salvoSemPerda.bytes !== null) {
+    /*
+     * O PDF de teste e VETORIAL, entao rasteriza-lo aumenta o arquivo — a fotografia de uma
+     * pagina quase em branco pesa mais que o vetor que a descrevia. Isso nao e defeito: a via
+     * forte existe para documento digitalizado. O que seria defeito e a tela nao dizer.
+     */
+    const cresceu = salvoForte.bytes > salvoSemPerda.bytes;
+    const avisouQueCresceu = await page.evaluate(
+      () => document.querySelector('[data-testid="compress-grew"]') !== null,
+    );
+
+    console.log(
+      'FORTE x S/PERDA:',
+      `${salvoForte.bytes} vs ${salvoSemPerda.bytes} bytes`,
+      cresceu ? '— cresceu, esperado num PDF de texto' : '— encolheu',
+      cresceu ? (avisouQueCresceu ? '| a tela avisou' : '| A TELA NAO AVISOU QUE CRESCEU') : '',
+    );
+  }
+  salvoForte.remover();
+}
+
 console.log('ERROS    :', errors.length === 0 ? 'nenhum' : JSON.stringify(errors.slice(0, 8)));
 
 // Isola a barreira do sistema operacional. Com o CSP desligado, o que sobra impedindo a

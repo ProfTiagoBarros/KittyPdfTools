@@ -2,6 +2,7 @@ import { buildComposition, readPageCount } from '../composition/build';
 import type { PageRef } from '../composition/types';
 import { expandPageRanges, parsePageRanges } from './page-ranges';
 import { coreError } from '../errors';
+import { yieldToEventLoop, throwIfAborted, type LongRunningOptions } from '../async';
 
 const SOURCE = 'documento';
 
@@ -46,44 +47,6 @@ export async function splitByRanges(
     options.onProgress?.(position + 1, ranges.length);
   }
   return volumes;
-}
-
-export interface LongRunningOptions {
-  readonly onProgress?: (completed: number, total: number) => void;
-  /**
-   * Cancelamento cooperativo: verificado entre unidades de trabalho. Dividir um PDF grande
-   * por tamanho pode levar minutos, e sem isto restaria ao usuario recarregar a pagina.
-   */
-  readonly signal?: AbortSignal;
-}
-
-/**
- * Devolve o controle ao laco de eventos entre unidades de trabalho.
- *
- * Sem isto o cancelamento cooperativo NAO funciona dentro de um Web Worker: uma sequencia de
- * `await` permanece na fila de microtarefas, e a mensagem de cancelamento — que e uma
- * macrotarefa — so seria lida depois que a operacao inteira terminasse. O sinal existiria,
- * mas ninguem o acionaria a tempo.
- *
- * Usa `MessageChannel` porque `setTimeout(0)` sofre limitacao de ~4 ms apos alguns
- * aninhamentos, o que somaria segundos num documento de centenas de paginas.
- */
-function yieldToEventLoop(): Promise<void> {
-  return new Promise((resolve) => {
-    const channel = new MessageChannel();
-    channel.port1.onmessage = () => {
-      channel.port1.close();
-      channel.port2.close();
-      resolve();
-    };
-    channel.port2.postMessage(undefined);
-  });
-}
-
-function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (signal?.aborted === true) {
-    throw new DOMException('Operacao cancelada', 'AbortError');
-  }
 }
 
 export interface SizeSplitResult {

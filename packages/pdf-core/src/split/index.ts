@@ -5,7 +5,7 @@ export {
   splitBySize,
   type SizeSplitResult,
   type SplitBySizeOptions,
-  type LongRunningOptions,
 } from './split';
+export type { LongRunningOptions } from '../async';
 export { packVolumes, volumeNames } from './archive';
 export type { ArchiveEntry } from './archive';

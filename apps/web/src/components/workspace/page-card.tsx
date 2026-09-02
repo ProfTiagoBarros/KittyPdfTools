@@ -2,7 +2,16 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronLeft, ChevronRight, Copy, RotateCcw, RotateCw, Search, Trash2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  RotateCcw,
+  RotateCw,
+  Search,
+  Trash2,
+  ZoomIn,
+} from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -21,6 +30,8 @@ interface PageCardProps {
   /** -1 move uma posicao para tras, +1 para a frente. */
   readonly onMove: (delta: number) => void;
   readonly onToggle: () => void;
+  /** Abre a visualizacao rapida desta pagina. */
+  readonly onPreview: () => void;
   readonly onRotate: (delta: number) => void;
   readonly onDuplicate: () => void;
   readonly onRemove: () => void;
@@ -36,6 +47,7 @@ export function PageCard({
   canMoveForward,
   onMove,
   onToggle,
+  onPreview,
   onRotate,
   onDuplicate,
   onRemove,
@@ -132,6 +144,21 @@ export function PageCard({
           espremeria os alvos de toque abaixo do tamanho utilizavel.
         */}
         <div className="flex flex-wrap justify-end gap-0.5 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
+          {/*
+            A lupa vem PRIMEIRA porque e a pergunta que se faz antes de qualquer acao:
+            "que pagina e esta?". Ordenar um documento longo pela miniatura nao responde isso,
+            e sem resposta o usuario so descobria o engano depois de gerar o PDF.
+          */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onPreview}
+            aria-label={t('action.preview')}
+            title={t('action.preview')}
+            data-testid="preview-open"
+          >
+            <ZoomIn />
+          </Button>
           <Button
             variant="ghost"
             size="icon"

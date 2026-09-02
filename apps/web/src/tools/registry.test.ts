@@ -6,8 +6,9 @@ describe('registro de ferramentas', () => {
   it('cobre as ferramentas do backlog, com extrair separada de dividir', () => {
     expect(TOOLS.map((tool) => tool.slug)).toEqual([
       'unir',
-      'dividir',
       'extrair',
+      'dividir',
+      'compactar',
       'ocr',
       'assinar',
       'ofuscar',

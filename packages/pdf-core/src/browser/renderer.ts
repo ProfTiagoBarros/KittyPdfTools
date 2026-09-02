@@ -119,10 +119,16 @@ export async function openForRendering(pdf: Uint8Array): Promise<DocumentRendere
 
     async rasterize(request: RasterizeRequest): Promise<RasterPage> {
       const { canvas, unscaled } = await draw(request.pageIndex, request.scale, request.blackout);
-      const blob = await canvas.convertToBlob({ type: 'image/png' });
+      const format = request.format ?? 'png';
+      const blob = await canvas.convertToBlob(
+        format === 'jpeg'
+          ? { type: 'image/jpeg', quality: request.quality ?? 0.7 }
+          : { type: 'image/png' },
+      );
 
       return {
-        png: new Uint8Array(await blob.arrayBuffer()),
+        image: new Uint8Array(await blob.arrayBuffer()),
+        format,
         widthPt: unscaled.width,
         heightPt: unscaled.height,
         widthPx: canvas.width,

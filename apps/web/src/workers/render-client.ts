@@ -1,6 +1,13 @@
-import type { RedactionArea } from 'pdf-core';
+import type { CompressionStep, RedactionArea } from 'pdf-core';
 import { restoreError } from './messages';
-import { isRenderResponse, type RenderRequest, type RenderResponse } from './render-protocol';
+import {
+  isRenderResponse,
+  type CompressMode,
+  type RenderRequest,
+  type RenderResponse,
+} from './render-protocol';
+
+export type { CompressMode };
 
 export interface Thumbnail {
   readonly bitmap: ImageBitmap;
@@ -11,8 +18,24 @@ export interface Thumbnail {
   readonly heightPt: number;
 }
 
+/** O que a compactacao produziu, junto com o que foi feito para chegar la. */
+export interface CompressionOutcome {
+  readonly pdf: Uint8Array;
+  readonly originalBytes: number;
+  readonly invisibleBlocksRemoved: number;
+  /** Falso quando o limite pedido nao coube nem no degrau mais agressivo. */
+  readonly fitsTarget: boolean;
+  readonly step: CompressionStep | null;
+  readonly attempts: number;
+}
+
 export interface RedactOptions {
   readonly scale?: number;
+  readonly onProgress?: (completed: number, total: number) => void;
+}
+
+/** Compactar so precisa relatar progresso; o "como" ja vai no proprio modo. */
+export interface CompressOptions {
   readonly onProgress?: (completed: number, total: number) => void;
 }
 
@@ -51,6 +74,17 @@ export interface RenderWorkspace {
    * ofuscacao pede a mesma pagina em tamanho grande, e uma nao pode servir pela outra.
    */
   thumbnail(documentId: string, pageIndex: number, maxEdge?: number): Promise<Thumbnail>;
+  /**
+   * Compacta a composicao ja montada e devolve o resultado com o que foi feito.
+   *
+   * Os bytes vao por transfer list: o buffer do lado da UI e destacado de proposito, para o
+   * documento nao existir duas vezes na memoria de um celular.
+   */
+  compress(
+    pdf: ArrayBuffer,
+    mode: CompressMode,
+    options?: CompressOptions,
+  ): Promise<CompressionOutcome>;
   redact(
     documentId: string,
     areas: readonly RedactionArea[],
@@ -220,6 +254,24 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
 
       textsInFlight.set(documentId, request);
       return request;
+    },
+
+    async compress(pdf, mode, options = {}) {
+      const resposta = await send(
+        { kind: 'compress', id: newId(), pdf, mode },
+        [pdf],
+        (message) => (message.kind === 'compressed' ? message : undefined),
+        options.onProgress,
+      );
+
+      return {
+        pdf: new Uint8Array(resposta.pdf),
+        originalBytes: resposta.originalBytes,
+        invisibleBlocksRemoved: resposta.invisibleBlocksRemoved,
+        fitsTarget: resposta.fitsTarget,
+        step: resposta.step,
+        attempts: resposta.attempts,
+      };
     },
 
     async redact(documentId, areas, options = {}) {

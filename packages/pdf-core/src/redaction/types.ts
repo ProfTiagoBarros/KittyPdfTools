@@ -7,9 +7,17 @@ export interface RedactionArea {
   readonly rect: Rect;
 }
 
+/** Codificacoes que o rasterizador sabe produzir. */
+export type RasterFormat = 'png' | 'jpeg';
+
 /** Uma pagina ja convertida em imagem, com o conteudo sensivel destruido no nivel do pixel. */
 export interface RasterPage {
-  readonly png: Uint8Array;
+  /**
+   * Bytes da imagem. O campo se chamava `png` enquanto so havia um formato; compactar
+   * precisa de JPEG, e manter o nome antigo passaria a mentir sobre o conteudo.
+   */
+  readonly image: Uint8Array;
+  readonly format: RasterFormat;
   /** Dimensoes da pagina em pontos, ja considerando rotacao. */
   readonly widthPt: number;
   readonly heightPt: number;
@@ -27,6 +35,13 @@ export interface RasterizeRequest {
    * Pintar sobre pixels e destrutivo: nao existe camada por baixo para recuperar.
    */
   readonly blackout: readonly Rect[];
+  /**
+   * Como codificar. PNG e sem perda e e o certo para ofuscar, que nao pode degradar prova;
+   * JPEG e o que faz um documento digitalizado caber num limite de tamanho.
+   */
+  readonly format?: RasterFormat;
+  /** Qualidade JPEG, de 0 a 1. Ignorada em PNG. */
+  readonly quality?: number;
 }
 
 /**

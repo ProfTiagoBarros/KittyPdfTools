@@ -6,6 +6,7 @@ export type {
   RedactionArea,
   RasterPage,
   RasterizeRequest,
+  RasterFormat,
   PageRasterizer,
 } from './redaction/types';
 export { paintBlackout } from './redaction/blackout';
@@ -17,3 +18,4 @@ export * from './verification/index';
 export * from './composition/index';
 export * from './split/index';
 export * from './ocr/index';
+export * from './compression/index';

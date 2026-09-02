@@ -15,9 +15,11 @@ import {
   rectSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
+import { useCallback, useState } from 'react';
 import { useTranslation } from '@/i18n';
 import { useWorkspaceStore } from '@/workspace/store';
 import { PageCard } from './page-card';
+import { PagePreview } from './page-preview';
 import { pageKey } from '@/workspace/search';
 
 export function PageGrid() {
@@ -31,6 +33,16 @@ export function PageGrid() {
   const rotate = useWorkspaceStore((state) => state.rotate);
   const duplicate = useWorkspaceStore((state) => state.duplicate);
   const remove = useWorkspaceStore((state) => state.remove);
+
+  /*
+   * A visualizacao segue a CHAVE do item, nao a posicao.
+   *
+   * Ela permite mover a pagina de dentro, e a posicao muda a cada movimento — guardar o
+   * indice faria a lupa saltar para a pagina vizinha exatamente no momento em que o usuario
+   * acabou de mover a que estava olhando.
+   */
+  const [previewKey, setPreviewKey] = useState<string | null>(null);
+  const closePreview = useCallback(() => setPreviewKey(null), []);
 
   /*
    * Tres sensores, um por forma de apontar, e nao um `PointerSensor` para todas.
@@ -94,6 +106,7 @@ export function PageGrid() {
               canMoveForward={index < items.length - 1}
               onMove={(delta) => moveItem(index, index + delta)}
               onToggle={() => toggleSelection(item.key)}
+              onPreview={() => setPreviewKey(item.key)}
               onRotate={(delta) => rotate([item.key], delta)}
               onDuplicate={() => duplicate([item.key])}
               onRemove={() => remove([item.key])}
@@ -101,6 +114,8 @@ export function PageGrid() {
           ))}
         </ul>
       </SortableContext>
+
+      {previewKey !== null && <PagePreview startKey={previewKey} onClose={closePreview} />}
     </DndContext>
   );
 }

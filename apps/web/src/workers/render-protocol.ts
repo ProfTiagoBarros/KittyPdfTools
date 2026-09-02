@@ -1,5 +1,5 @@
 import { isEnvelope } from './messages';
-import type { RedactionArea } from 'pdf-core';
+import type { CompressionStep, RedactionArea } from 'pdf-core';
 import type { CancelledMessage, ErrorMessage, ProgressMessage } from './messages';
 
 /**
@@ -40,6 +40,31 @@ export interface RedactRequest {
   readonly scale?: number;
 }
 
+/**
+ * Como compactar. Tres intencoes distintas, e nao um numero de "nivel".
+ *
+ * `lossless` nao mexe em pixel algum; os outros dois rasterizam e por isso perdem texto. A
+ * interface confirma antes de executar qualquer um dos dois ultimos.
+ */
+export type CompressMode =
+  | { readonly kind: 'lossless'; readonly removeInvisibleText: boolean }
+  | { readonly kind: 'quality'; readonly step: CompressionStep }
+  | { readonly kind: 'target'; readonly maxBytes: number };
+
+/**
+ * Compacta um PDF ja montado.
+ *
+ * Recebe os BYTES, e nao um `documentId`: compactar age sobre a composicao da grade — que
+ * pode misturar paginas de varios arquivos —, e nao sobre um documento de origem. O worker
+ * abre, trabalha e descarta, sem sujar o mapa de documentos abertos.
+ */
+export interface CompressRequest {
+  readonly kind: 'compress';
+  readonly id: string;
+  readonly pdf: ArrayBuffer;
+  readonly mode: CompressMode;
+}
+
 export interface OcrRequest {
   readonly kind: 'ocr';
   readonly id: string;
@@ -57,7 +82,13 @@ export interface PageTextsRequest {
 }
 
 export type RenderRequest =
-  OpenRequest | CloseRequest | ThumbnailRequest | RedactRequest | OcrRequest | PageTextsRequest;
+  | OpenRequest
+  | CloseRequest
+  | ThumbnailRequest
+  | RedactRequest
+  | CompressRequest
+  | OcrRequest
+  | PageTextsRequest;
 
 export interface OpenedMessage {
   readonly kind: 'opened';
@@ -89,6 +120,21 @@ export interface RedactedMessage {
   readonly pdf: ArrayBuffer;
 }
 
+export interface CompressedMessage {
+  readonly kind: 'compressed';
+  readonly id: string;
+  readonly pdf: ArrayBuffer;
+  readonly originalBytes: number;
+  /** Blocos de texto invisivel removidos; so no modo sem perda. */
+  readonly invisibleBlocksRemoved: number;
+  /** Falso quando o limite pedido nao foi alcancado nem no degrau mais agressivo. */
+  readonly fitsTarget: boolean;
+  /** Degrau usado, quando houve rasterizacao. */
+  readonly step: CompressionStep | null;
+  /** Geracoes completas gastas pela busca por tamanho. */
+  readonly attempts: number;
+}
+
 export interface OcrDoneMessage {
   readonly kind: 'ocrDone';
   readonly id: string;
@@ -114,6 +160,7 @@ export type RenderResponse =
   | ClosedMessage
   | ThumbnailMessage
   | RedactedMessage
+  | CompressedMessage
   | OcrDoneMessage
   | ProgressMessage
   | CancelledMessage
@@ -124,6 +171,7 @@ const RESPONSE_KINDS = new Set([
   'closed',
   'thumbnail',
   'redacted',
+  'compressed',
   'ocrDone',
   'pageTexts',
   'progress',
