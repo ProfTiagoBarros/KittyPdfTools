@@ -348,9 +348,27 @@ um build inteiro).
 | US-05 | Assinatura ICP-Brasil    | A1 `.pfx` só em memória; chave nunca persistida, logada ou transmitida                    |
 | US-06 | Busca de campo aberto    | Destaca (não filtra) páginas com ≥1 ocorrência, entre PDFs distintos                      |
 
-**Estado:** backlog completo, verificado no Windows e no Android real.
-**Ainda não existe:** APK de release assinado, build macOS/Linux, carimbo AD-RT, conformidade
-ICP-Brasil, via cirúrgica de ofuscação.
+**Estado (03/09/2026):** backlog completo (US-01 a US-08), verificado por dentro do pacote no
+Windows e no Android real. 215 testes unitários, 200+ E2E, lint e typecheck verdes. Tudo
+commitado e sincronizado com `origin/main`.
+
+**Fase atual:** validação com o administrativo da escola, em Windows e Android, antes de
+publicar. Os artefatos de teste ficam em `Desktop/PDFKitty-para-testar/`.
+
+**Próxima fase — publicação.** Nesta ordem, e nada disso começou:
+
+1. **Keystore de release** para a Play Store. É material sensível: quem gera é o usuário, e a
+   senha nunca entra no repositório nem em log. Perder o keystore após publicar **impede
+   atualizar o app para sempre**.
+2. **APK/AAB de release assinado.** Atenção: o `verify:android` **não roda contra release** — só
+   o build de debug expõe o socket de depuração. Medir antes de assinar.
+3. **Microsoft Store**: exige assinatura de código (o SmartScreen hoje alerta "editor
+   desconhecido") e empacotamento MSIX, que o Tauri gera mas ainda não foi exercitado aqui.
+4. Política de privacidade e ficha da loja — o argumento de venda é a Regra de Ouro 1, e a
+   ausência da permissão `INTERNET` é verificável por qualquer auditor.
+
+**Ainda não existe:** keystore e APK de release, MSIX, build macOS/Linux, carimbo AD-RT,
+conformidade DOC-ICP-15, via cirúrgica de ofuscação.
 
 ---
 
