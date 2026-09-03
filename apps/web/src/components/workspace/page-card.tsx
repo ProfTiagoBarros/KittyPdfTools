@@ -92,6 +92,7 @@ export function PageCard({
       <button
         type="button"
         onClick={onToggle}
+        data-testid="select-page"
         className="flex h-32 cursor-grab items-center justify-center overflow-hidden rounded active:cursor-grabbing"
         aria-pressed={selected}
         aria-label={accessibleLabel}
@@ -103,6 +104,28 @@ export function PageCard({
           fileName={fileName}
         />
       </button>
+
+      {/*
+        A lupa fica SOBRE a miniatura, e nao na fila de acoes.
+
+        Medido no aparelho: como setimo icone de 32px ela reprovava como alvo de toque, e e
+        justamente a pergunta que se faz antes de qualquer acao — "que pagina e esta?". Aqui
+        ela tem 44px, o minimo praticavel para o dedo, e nao disputa espaco com as outras seis.
+
+        `stopPropagation` no ponteiro porque o cartao inteiro e alca de arraste: sem isso, um
+        toque um pouco mais longo viraria drag em vez de abrir a pagina.
+      */}
+      <Button
+        variant="outline"
+        onClick={onPreview}
+        onPointerDown={(event) => event.stopPropagation()}
+        aria-label={t('action.preview')}
+        title={t('action.preview')}
+        data-testid="preview-open"
+        className="absolute top-3 right-3 z-10 h-11 w-11 rounded-full p-0 shadow-sm"
+      >
+        <ZoomIn />
+      </Button>
 
       {matched && (
         <span
@@ -144,21 +167,6 @@ export function PageCard({
           espremeria os alvos de toque abaixo do tamanho utilizavel.
         */}
         <div className="flex flex-wrap justify-end gap-0.5 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
-          {/*
-            A lupa vem PRIMEIRA porque e a pergunta que se faz antes de qualquer acao:
-            "que pagina e esta?". Ordenar um documento longo pela miniatura nao responde isso,
-            e sem resposta o usuario so descobria o engano depois de gerar o PDF.
-          */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onPreview}
-            aria-label={t('action.preview')}
-            title={t('action.preview')}
-            data-testid="preview-open"
-          >
-            <ZoomIn />
-          </Button>
           <Button
             variant="ghost"
             size="icon"

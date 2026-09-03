@@ -1,6 +1,14 @@
 import { test, expect } from '@playwright/test';
 
-const TOOL_SLUGS = ['unir', 'extrair', 'dividir', 'compactar', 'ocr', 'assinar', 'ofuscar'] as const;
+const TOOL_SLUGS = [
+  'unir',
+  'extrair',
+  'dividir',
+  'compactar',
+  'ocr',
+  'assinar',
+  'ofuscar',
+] as const;
 
 test('a home lista todas as ferramentas', async ({ page }) => {
   await page.goto('/');

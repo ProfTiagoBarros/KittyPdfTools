@@ -220,6 +220,12 @@ ausência de `thumbnail-placeholder`.
 teclado) mais botões explícitos de mover. As ações do cartão ficam visíveis por padrão no celular:
 esconder atrás do `hover` as torna inalcançáveis no toque.
 
+**Todo `fixed` colado embaixo respeita a área segura**, não só a barra principal: o rodapé da
+lupa nasceu sem ela e terminava em 693px de uma janela de 693px com inset de 48px — mover, girar
+e navegar ficavam atrás dos botões do Android. **Alvo de toque mínimo 44px:** a lupa reprovou com
+32px como sétimo ícone da fila e foi para cima da miniatura, com teste fixando o tamanho. A suíte
+inteira passava, porque nenhum teste media dimensão.
+
 **Barra inferior respeita a área segura** (`viewport-fit=cover` + `env(safe-area-inset-bottom)`).
 Medido: inset de 48px, botão 12px acima dela.
 
@@ -268,6 +274,12 @@ Medido: inset de 48px, botão 12px acima dela.
 - `window.__TAURI_INTERNALS__.invoke` é `writable: false`: a substituição **não lança**, é
   ignorada em silêncio.
 - `uiautomator dump` durante animação devolve árvore vazia; insista até o seletor **fechar**.
+- **Meça o botão, não a caixa que o contém.** O rodapé da lupa vive num `fixed inset-0`: o fundo
+  dele coincide sempre com a borda da janela, e medi-lo acusava invasão da área do sistema mesmo
+  com o afastamento correto. Botão em 597px de 693px com inset 48px é o que prova.
+- A janela de espera do salvamento precisa ser **generosa** (90 s): o seletor cria o documento
+  antes de a geração começar, e dividir ou compactar no celular passa de 20 s. Janela curta
+  relatava "NADA gravado" para operação que só estava demorando.
 - Para saber se o seletor fechou, pergunte pelo `topResumedActivity`: `dumpsys activity
 activities` continua listando o `documentsui` na pilha, e o relatório acusava seletor aberto
   logo abaixo de um arquivo gravado corretamente.

@@ -292,7 +292,11 @@ const habilitado = (testId) =>
 const cartoesExtrair = await abrirComPdf('/extrair/', 6);
 const ligacao = await page.evaluate(async () => {
   const cartoes = [...document.querySelectorAll('[data-testid="page-card"]')];
-  for (const indice of [0, 1, 2]) cartoes[indice]?.querySelector('button')?.click();
+  // Pelo `data-testid` do botao de selecao: `querySelector('button')` pegava o primeiro
+  // botao do cartao, e quando a lupa entrou ela passou a ser esse primeiro.
+  for (const indice of [0, 1, 2]) {
+    cartoes[indice]?.querySelector('[data-testid="select-page"]')?.click();
+  }
   await new Promise((resolve) => setTimeout(resolve, 400));
   return document.querySelector('[data-testid="extract-ranges-input"]')?.value ?? null;
 });

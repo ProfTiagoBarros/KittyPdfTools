@@ -196,7 +196,13 @@ export function PagePreview({ startKey, onClose }: PagePreviewProps) {
         acoes no meio: a ordem de leitura acompanha a ordem de uso — olho a pagina, corrijo
         se preciso, sigo para a proxima.
       */}
-      <footer className="flex items-center justify-between gap-1 p-3">
+      {/*
+        A area segura vale aqui tambem. Medido no aparelho: sem isto, o rodape terminava
+        exatamente na borda da janela (693px de 693px, com 48px de inset) e mover, girar e
+        navegar ficavam ATRAS dos botoes de navegacao do Android — o mesmo defeito que ja
+        escondeu o botao de exportar, repetido num `fixed` novo que nao herdou a correcao.
+      */}
+      <footer className="flex items-center justify-between gap-1 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <Button
           size="icon"
           onClick={() => go(-1)}

@@ -23,11 +23,9 @@ const campo = (page: Page) => page.getByTestId('extract-ranges-input');
 
 /** Marca uma pagina clicando na miniatura, como o usuario faz. */
 async function marcar(page: Page, indice: number): Promise<void> {
-  await cards(page)
-    .nth(indice)
-    .getByRole('button', { name: /pagina|page/i })
-    .first()
-    .click();
+  // Por `data-testid`, e nao pelo rotulo: em portugues o rotulo da lupa tambem contem
+  // "pagina", e um seletor por texto passou a pegar o botao errado.
+  await cards(page).nth(indice).getByTestId('select-page').click();
 }
 
 test.beforeEach(async ({ page }) => {

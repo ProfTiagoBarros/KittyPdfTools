@@ -144,11 +144,9 @@ test('campo e grade sao a mesma escolha, nos dois sentidos', async ({ page }) =>
 
   // Grade -> campo: paginas contiguas viram faixa, a isolada fica sozinha.
   for (const indice of [0, 1, 2, 6]) {
-    await cards(page)
-      .nth(indice)
-      .getByRole('button', { name: /pagina|page/i })
-      .first()
-      .click();
+    // Por `data-testid`: o rotulo da lupa em portugues tambem contem "pagina", e o seletor
+    // por texto passou a pegar o botao errado quando ela entrou no cartao.
+    await cards(page).nth(indice).getByTestId('select-page').click();
   }
   await expect(campo).toHaveValue('1-3, 7');
 

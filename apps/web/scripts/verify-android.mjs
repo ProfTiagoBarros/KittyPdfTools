@@ -356,6 +356,9 @@ async function salvarPeloSeletor(nomeArquivo, acionar) {
 
   let bytes = null;
   let confirmacao = 'seletor nao abriu';
+  /** Ultimo tamanho observado durante a espera, para distinguir "falhou" de "demorou". */
+  let ultimoVisto = null;
+  let segundos = 0;
 
   if (seletor !== 'nao abriu') {
     // O seletor precisa ASSENTAR antes do toque: a arvore de UI existe enquanto a tela ainda
@@ -391,15 +394,25 @@ async function salvarPeloSeletor(nomeArquivo, acionar) {
     } else {
       confirmacao = seletorAberto() ? 'toquei, mas o seletor continua aberto' : 'confirmei';
 
-      // Espera o tamanho ESTABILIZAR, e nao apenas aparecer: a gravacao e assincrona, e medir
-      // cedo demais reporta um arquivo pela metade como se estivesse pronto. Aconteceu de
-      // verdade numa sonda — o `stat` deu 0 MB e o arquivo tinha megabytes segundos depois.
+      /*
+       * Espera o tamanho ESTABILIZAR, e nao apenas aparecer: a gravacao e assincrona, e medir
+       * cedo demais reporta um arquivo pela metade como se estivesse pronto. Aconteceu de
+       * verdade numa sonda — o `stat` deu 0 MB e o arquivo tinha megabytes segundos depois.
+       *
+       * A janela e generosa porque o seletor cria o documento ANTES de a geracao comecar:
+       * dividir gera um PDF por faixa e compactar rasteriza pagina a pagina, e no celular isso
+       * passa facilmente de vinte segundos. Com a janela curta, o relatorio dizia "NADA
+       * gravado" para operacoes que estavam apenas demorando — acusar defeito onde havia
+       * lentidao e pior do que nao medir.
+       */
       let anterior = -1;
-      for (let tentativa = 0; tentativa < 20 && bytes === null; tentativa += 1) {
+      for (let tentativa = 0; tentativa < 90 && bytes === null; tentativa += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const agora = tamanhoNoAparelho();
         if (agora !== null && agora === anterior && agora > 0) bytes = agora;
+        if (agora !== null) ultimoVisto = agora;
         anterior = agora ?? -1;
+        segundos = tentativa + 1;
       }
     }
   }
@@ -409,7 +422,18 @@ async function salvarPeloSeletor(nomeArquivo, acionar) {
   const assinatura = bytes === null ? null : adb('shell', 'head', '-c', '5', caminho).trim();
   const fim = bytes === null ? null : adb('shell', 'tail', '-c', '32', caminho).trim();
 
-  return { nomeArquivo, caminho, seletor, confirmacao, bytes, assinatura, fim, remover };
+  return {
+    nomeArquivo,
+    caminho,
+    seletor,
+    confirmacao,
+    bytes,
+    ultimoVisto,
+    segundos,
+    assinatura,
+    fim,
+    remover,
+  };
 }
 
 /** Um PDF comeca em %PDF e termina em %%EOF; um ZIP comeca em PK. */
@@ -418,7 +442,14 @@ function relatar(rotulo, salvo, tipo) {
   console.log(`${rotulo} SELETOR:`, salvo.seletor, `| ${salvo.confirmacao}`);
 
   if (salvo.bytes === null) {
-    console.log(`${rotulo} ARQUIVO:`, `NADA gravado em ${salvo.caminho}`);
+    // Diz O QUE se viu, e nao so que nao deu: um arquivo que apareceu e estava crescendo e um
+    // problema de espera; um que nunca existiu e um problema de gravacao.
+    console.log(
+      `${rotulo} ARQUIVO:`,
+      salvo.ultimoVisto === null
+        ? `NADA gravado em ${salvo.caminho} (nem 0 bytes) apos ${salvo.segundos}s`
+        : `nao estabilizou em ${salvo.segundos}s; ultimo tamanho visto ${salvo.ultimoVisto} bytes`,
+    );
     return false;
   }
 
@@ -593,7 +624,11 @@ console.log('EXTRAIR  :', `rota carregou, ${cartoesExtrair} cartao(oes) na grade
 // jeito que ele escolhe — clicando — e o criterio e o campo se preencher sozinho.
 const ligacao = await page.evaluate(async () => {
   const cartoes = [...document.querySelectorAll('[data-testid="page-card"]')];
-  for (const indice of [0, 1, 2]) cartoes[indice]?.querySelector('button')?.click();
+  // Pelo `data-testid` do botao de selecao: `querySelector('button')` pegava o primeiro
+  // botao do cartao, e quando a lupa entrou ela passou a ser esse primeiro.
+  for (const indice of [0, 1, 2]) {
+    cartoes[indice]?.querySelector('[data-testid="select-page"]')?.click();
+  }
   await new Promise((resolve) => setTimeout(resolve, 500));
 
   return {
@@ -762,6 +797,128 @@ if (comAviso.avisoNaTela) {
     );
   }
   salvoForte.remover();
+}
+
+// --- LUPA -------------------------------------------------------------------
+//
+// No celular ela responde a uma pergunta que o desktop nao faz: o botao e ALCANCAVEL pelo
+// dedo? Um alvo abaixo de ~40px reprova na pratica mesmo aparecendo na tela. E a barra de
+// acoes da lupa nao pode cair atras dos botoes de navegacao do Android, o mesmo defeito que
+// ja escondeu o botao de exportar.
+
+const cartoesLupa = await abrirComPdf('/unir/', 4);
+console.log('LUPA     :', `rota carregou, ${cartoesLupa} cartao(oes) na grade`);
+
+const lupa = await page.evaluate(async () => {
+  const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const cartoes = [...document.querySelectorAll('[data-testid="page-card"]')];
+  const chaves = cartoes.map((cartao) => cartao.getAttribute('data-page-key'));
+
+  const botaoLupa = cartoes.at(-1)?.querySelector('[data-testid="preview-open"]');
+  const alvo = botaoLupa?.getBoundingClientRect();
+
+  // Abre pela ULTIMA pagina: e onde mover para tras tem efeito verificavel.
+  botaoLupa?.click();
+  await esperar(3000);
+
+  const visor = document.querySelector('[data-testid="page-preview"]');
+  if (visor === null) return { aberto: false, alvo: null };
+
+  const canvas = document.querySelector('[data-testid="preview-canvas"]');
+  const desenhou = document.querySelector('[data-testid="preview-status"]') === null;
+
+  // A pagina desenhada cabe na tela? Estourar a altura deixaria o rodape inalcancavel.
+  const caixaCanvas = canvas?.getBoundingClientRect();
+  const rodape = visor.querySelector('footer')?.getBoundingClientRect();
+  /*
+   * Mede o BOTAO, e nao a caixa do rodape.
+   *
+   * O rodape vive dentro de um `fixed inset-0`, entao o fundo dele coincide sempre com a
+   * borda da janela — medi-lo acusava invasao da area do sistema mesmo com o afastamento
+   * correto aplicado. E o botao que precisa ficar acima dos botoes do Android, e e ele que
+   * o afastamento empurra. Medir a caixa errada gritava defeito onde nao havia.
+   */
+  const botaoDoRodape = document
+    .querySelector('[data-testid="preview-move-back"]')
+    ?.getBoundingClientRect();
+
+  const chaveNaLupa = visor.getAttribute('data-page-key');
+  document.querySelector('[data-testid="preview-move-back"]')?.click();
+  await esperar(700);
+
+  const posicao = document.querySelector('[data-testid="preview-position"]')?.textContent ?? '';
+  const aindaNaMesma =
+    document.querySelector('[data-testid="page-preview"]')?.getAttribute('data-page-key') ===
+    chaveNaLupa;
+
+  // Ampliar: e o caminho de quem nao consegue ler uma matricula na pagina inteira.
+  document.querySelector('[data-testid="preview-zoom"]')?.click();
+  await esperar(500);
+  const ampliado =
+    document.querySelector('[data-testid="preview-stage"]')?.getAttribute('data-zoomed') === 'true';
+
+  document.querySelector('[data-testid="preview-close"]')?.click();
+  await esperar(400);
+
+  const depois = [...document.querySelectorAll('[data-testid="page-card"]')].map((cartao) =>
+    cartao.getAttribute('data-page-key'),
+  );
+
+  return {
+    aberto: true,
+    desenhou,
+    larguraPx: canvas?.width ?? 0,
+    alvo: alvo === undefined ? null : { w: Math.round(alvo.width), h: Math.round(alvo.height) },
+    canvasCabe:
+      caixaCanvas !== undefined && rodape !== undefined
+        ? Math.round(caixaCanvas.bottom) <= Math.round(rodape.top) + 1
+        : null,
+    fundoDoRodape: rodape === undefined ? null : Math.round(rodape.bottom),
+    fundoDoBotao: botaoDoRodape === undefined ? null : Math.round(botaoDoRodape.bottom),
+    alturaJanela: window.innerHeight,
+    posicao: posicao.trim(),
+    aindaNaMesma,
+    ampliado,
+    reordenou: depois[depois.length - 2] === chaves[chaves.length - 1],
+    fechou: document.querySelector('[data-testid="page-preview"]') === null,
+  };
+});
+
+if (!lupa.aberto) {
+  console.log('LUPA ABRIR: NAO ABRIU');
+} else {
+  // 40px e o minimo praticavel para o dedo; abaixo disso o botao existe mas nao se acerta.
+  const alvoOk = lupa.alvo !== null && lupa.alvo.w >= 40 && lupa.alvo.h >= 40;
+  console.log(
+    'LUPA ALVO :',
+    lupa.alvo === null ? 'botao ausente' : `${lupa.alvo.w}x${lupa.alvo.h}px`,
+    alvoOk ? '| alcancavel pelo dedo' : '| ALVO PEQUENO DEMAIS PARA TOQUE',
+  );
+  console.log(
+    'LUPA PAG  :',
+    lupa.desenhou ? `desenhou ${lupa.larguraPx}px` : 'NAO DESENHOU A PAGINA',
+    lupa.larguraPx > 600 ? '| resolucao de leitura' : '| RESOLUCAO BAIXA DEMAIS',
+    lupa.canvasCabe === true ? '| cabe acima do rodape' : '| A PAGINA INVADE O RODAPE',
+  );
+  console.log(
+    'LUPA ACAO :',
+    `${lupa.posicao}`,
+    lupa.aindaNaMesma ? '| seguiu a pagina ao mover' : '| SALTOU DE PAGINA AO MOVER',
+    lupa.reordenou ? '| a grade recebeu o movimento' : '| A GRADE NAO MUDOU',
+    lupa.ampliado ? '| ampliar respondeu' : '| AMPLIAR NAO RESPONDEU',
+    lupa.fechou ? '| fechou' : '| NAO FECHOU',
+  );
+
+  // O rodape da lupa e um `fixed` proprio: precisa respeitar a area do sistema, como a barra
+  // inferior do app ja respeita. Sem isso, mover e girar ficam atras dos botoes do Android.
+  console.log(
+    'LUPA AREA :',
+    `fundo do botao=${lupa.fundoDoBotao}px | janela=${lupa.alturaJanela}px | inset=${areaSegura.inset}px`,
+    lupa.fundoDoBotao !== null && lupa.fundoDoBotao > lupa.alturaJanela - areaSegura.inset
+      ? '| OS BOTOES INVADEM A AREA DO SISTEMA'
+      : '| os botoes ficam acima da area do sistema',
+  );
 }
 
 console.log('ERROS    :', errors.length === 0 ? 'nenhum' : JSON.stringify(errors.slice(0, 8)));

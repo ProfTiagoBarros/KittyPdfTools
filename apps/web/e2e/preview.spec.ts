@@ -46,6 +46,23 @@ test('toda pagina tem lupa, e ela abre a visualizacao', async ({ page }) => {
   await expect(page.getByTestId('preview-position')).toContainText('3');
 });
 
+/**
+ * O botao precisa ser ALCANCAVEL pelo dedo, nao apenas visivel.
+ *
+ * Medido no aparelho: como setimo icone da fila de acoes, a lupa tinha 32x32px e reprovava
+ * como alvo de toque — o recurso existia e nao se acertava nele. A suite inteira passava,
+ * porque nenhum teste olhava tamanho. Este olha.
+ */
+test('a lupa e grande o bastante para o dedo', async ({ page }) => {
+  await attach(page, 'boletins.pdf', 2);
+  await expect(cards(page)).toHaveCount(2);
+
+  const caixa = await cards(page).nth(0).getByTestId('preview-open').boundingBox();
+  expect(caixa).not.toBeNull();
+  expect(caixa?.width ?? 0).toBeGreaterThanOrEqual(44);
+  expect(caixa?.height ?? 0).toBeGreaterThanOrEqual(44);
+});
+
 test('a lupa diz de qual arquivo e de qual pagina dele veio', async ({ page }) => {
   await attach(page, 'turma-a.pdf', 2);
   // Espera o primeiro entrar ANTES de anexar o segundo: os dois carregamentos sao assincronos
