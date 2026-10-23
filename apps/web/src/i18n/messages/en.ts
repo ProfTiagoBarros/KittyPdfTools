@@ -238,6 +238,5 @@ export const en: Messages = {
     'It lacks OffscreenCanvas, used to draw pages off the main thread. Thumbnails, redaction and OCR are unavailable here.',
   'unsupported.workaround': 'Merge, split and sign keep working normally.',
 
-  'privacy.badge': '100% local processing',
   'privacy.explanation': 'No file is ever uploaded. All processing happens inside your browser.',
 };

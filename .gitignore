@@ -52,3 +52,6 @@ apps/web/public/tesseract/
 # Documentos reais usados em testes manuais (dados pessoais, LGPD). Nunca versionar: para medir
 # desempenho, use fixtures sinteticas com o mesmo peso.
 documentos/
+
+# Cache incremental do TypeScript: artefato de build, muda a cada typecheck.
+*.tsbuildinfo

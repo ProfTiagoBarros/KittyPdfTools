@@ -240,7 +240,6 @@ export const ptBR = {
     'Falta suporte a OffscreenCanvas, usado para desenhar as paginas fora da thread principal. Miniaturas, ofuscacao e OCR ficam indisponiveis aqui.',
   'unsupported.workaround': 'Unir, dividir e assinar continuam funcionando normalmente.',
 
-  'privacy.badge': 'Processamento 100% local',
   'privacy.explanation':
     'Nenhum arquivo e enviado para servidores. Todo o processamento acontece no seu navegador.',
 } as const;
