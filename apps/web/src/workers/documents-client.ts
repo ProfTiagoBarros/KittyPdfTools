@@ -28,6 +28,8 @@ export interface DocumentWorkspace {
    */
   load(documentId: string, bytes: ArrayBuffer): Promise<number>;
   unload(documentId: string): Promise<void>;
+  /** Copia dos bytes de um documento carregado, para o worker de renderizacao reabri-lo. */
+  copyOf(documentId: string): Promise<ArrayBuffer>;
   compose(composition: readonly PageRef[]): Promise<Uint8Array>;
   extract(documentId: string, spec: string): Promise<Uint8Array>;
   splitByRanges(
@@ -132,6 +134,12 @@ export function createDocumentWorkspace(): DocumentWorkspace {
     async unload(documentId) {
       await send({ kind: 'unload', id: newId(), documentId }, [], (message) =>
         message.kind === 'unloaded' ? true : undefined,
+      );
+    },
+
+    async copyOf(documentId) {
+      return send({ kind: 'copy', id: newId(), documentId }, [], (message) =>
+        message.kind === 'copied' ? message.bytes : undefined,
       );
     },
 

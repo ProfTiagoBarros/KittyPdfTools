@@ -82,6 +82,21 @@ export async function writeTo(destination: Destination, bytes: Uint8Array): Prom
 }
 
 /**
+ * Copia um arquivo ja gravado para um novo destino, sem passar os bytes pela memoria da tela.
+ *
+ * So existe no app instalado: e o plugin proprio que le a origem e escreve o destino. Na web
+ * o navegador nao deixa reler o que foi baixado.
+ */
+export async function copySaved(source: string, destination: Destination): Promise<void> {
+  if (destination.kind !== 'system') {
+    throw new Error('copiar um arquivo salvo so e possivel no app instalado');
+  }
+
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('plugin:saf-save|copy_saved', { source, destination: destination.path });
+}
+
+/**
  * Descarta um destino que ficou vazio.
  *
  * No Android o seletor **cria o documento** no instante em que o usuario confirma o nome,

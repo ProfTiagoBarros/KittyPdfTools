@@ -81,7 +81,26 @@ export type DocumentRequest =
   | SplitByRangesRequest
   | SplitBySizeRequest
   | SplitCompositionRequest
+  | CopyRequest
   | CancelRequest;
+
+/**
+ * Pede uma copia dos bytes de um documento.
+ *
+ * Este worker e o dono dos bytes; o de renderizacao solta a dele durante as operacoes pesadas
+ * e, ao final, reabre a partir daqui. A copia e transferida, nao duplicada no caminho.
+ */
+export interface CopyRequest {
+  readonly kind: 'copy';
+  readonly id: string;
+  readonly documentId: string;
+}
+
+export interface CopiedMessage {
+  readonly kind: 'copied';
+  readonly id: string;
+  readonly bytes: ArrayBuffer;
+}
 
 export interface LoadedMessage {
   readonly kind: 'loaded';
@@ -113,6 +132,7 @@ export type DocumentResponse =
   | LoadedMessage
   | UnloadedMessage
   | BuiltMessage
+  | CopiedMessage
   | VolumesMessage
   | ProgressMessage
   | CancelledMessage
@@ -122,6 +142,7 @@ const RESPONSE_KINDS = new Set([
   'loaded',
   'unloaded',
   'built',
+  'copied',
   'volumes',
   'progress',
   'cancelled',

@@ -19,6 +19,12 @@ class CopyToUriArgs {
 }
 
 @InvokeArg
+class CopySavedArgs {
+    lateinit var source: String
+    lateinit var destination: String
+}
+
+@InvokeArg
 class DiscardUriArgs {
     lateinit var destination: String
 }
@@ -55,6 +61,44 @@ class SafSavePlugin(private val activity: Activity) : Plugin(activity) {
             invoke.resolve()
         } catch (erro: Exception) {
             invoke.reject(erro.message ?: "falha ao gravar no destino escolhido")
+        }
+    }
+
+    /**
+     * Copia um documento ja salvo para um novo destino: o "salvar de novo".
+     *
+     * Existe para a interface nao manter o arquivo gerado na memoria. A permissao de leitura
+     * da origem vale enquanto o processo do app viver, e o "salvar de novo" so existe nesse
+     * intervalo: depois de reiniciar, nao ha ultima geracao a reoferecer.
+     *
+     * Origem igual ao destino nao faz nada: abrir o destino em "wt" trunca, e sendo o mesmo
+     * documento, a origem seria zerada antes de ser lida.
+     */
+    @Command
+    fun copySaved(invoke: Invoke) {
+        val args = invoke.parseArgs(CopySavedArgs::class.java)
+
+        if (args.source == args.destination) {
+            invoke.resolve()
+            return
+        }
+
+        try {
+            val entrada = activity.contentResolver.openInputStream(Uri.parse(args.source))
+                ?: throw IOException("nao foi possivel ler o arquivo salvo")
+
+            entrada.use { origem ->
+                val saida = activity.contentResolver.openOutputStream(Uri.parse(args.destination), "wt")
+                    ?: throw IOException("nao foi possivel abrir o destino para escrita")
+
+                saida.use { destino ->
+                    origem.copyTo(destino)
+                    destino.flush()
+                }
+            }
+            invoke.resolve()
+        } catch (erro: Exception) {
+            invoke.reject(erro.message ?: "falha ao copiar o arquivo salvo")
         }
     }
 

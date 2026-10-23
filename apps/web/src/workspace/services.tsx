@@ -1,8 +1,10 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createRenderWorkspace, type RenderWorkspace } from '@/workers/render-client';
 import { createDocumentWorkspace, type DocumentWorkspace } from '@/workers/documents-client';
+import type { GenerationAround } from '@/lib/generation';
+import { useWorkspaceStore } from './store';
 
 export interface WorkspaceServices {
   /** Miniaturas e ofuscacao. Detem os documentos abertos no pdf.js. */
@@ -61,4 +63,36 @@ export function WorkspaceServicesProvider({ children }: { children: ReactNode })
 /** Devolve `null` ate os workers existirem — a UI mostra o estado de carregamento. */
 export function useWorkspaceServices(): WorkspaceServices | null {
   return useContext(ServicesContext);
+}
+
+/**
+ * Libera as paginas da renderizacao durante uma operacao pesada e as recarrega depois.
+ *
+ * Medido com dois PDFs de 200 paginas (287 MB): a juncao chegava a 1,8 GB, e a copia do
+ * pdf.js no worker de renderizacao ocupava o tamanho inteiro dos arquivos sem fazer nada
+ * enquanto o pdf-lib montava o resultado. Num Windows 32 bits o processo inteiro tem ~2 GB, e
+ * a margem que sobrava dependia de o coletor de lixo rodar na hora certa.
+ *
+ * O custo e recarregar os documentos depois — rapido, porque o pdf.js le sob demanda — e as
+ * miniaturas ja desenhadas continuam no cache.
+ *
+ * A lista de documentos e lida na hora de RESTAURAR, e nao na de liberar: o usuario pode ter
+ * removido um arquivo enquanto a operacao rodava, e reabrir um documento que ja nao existe
+ * seria um erro novo criado por esta otimizacao.
+ */
+export function usePageMemoryRelease(): GenerationAround | undefined {
+  const services = useWorkspaceServices();
+
+  return useMemo(() => {
+    if (services === null) return undefined;
+
+    return {
+      before: () => services.render.release(),
+      after: () =>
+        services.render.restore(
+          useWorkspaceStore.getState().documents.map((document) => document.id),
+          (documentId) => services.documents.copyOf(documentId),
+        ),
+    };
+  }, [services]);
 }

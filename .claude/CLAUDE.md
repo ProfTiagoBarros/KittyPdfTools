@@ -294,6 +294,27 @@ activities` continua listando o `documentsui` na pilha, e o relatório acusava s
 - Daemons do Gradle seguram o canal de saída depois de terminar — confira o artefato em disco em
   vez de esperar o aviso da tarefa.
 
+**Memória** — orçamento: Windows 32 bits dá **~2 GB por processo**, e a tela e os workers
+dividem o mesmo processo. Medido com dois PDFs escaneados de 200 páginas (287 MB): juntar foi de
+1.547 para 969 MB vivos; a segunda junção, de 1.835 para 969.
+
+- **`page.cleanup()` depois de todo desenho e extração de texto.** Sem isso o pdf.js guarda a
+  imagem decodificada de cada página (~8 MB numa escaneada): rolar a grade somava 1 GB.
+- `pdfjsDocumentOptions` **copia** os bytes por padrão (`new Uint8Array(pdf)`). O worker de
+  renderização abre com `adopt: true` e **não guarda cópia própria**; ofuscar e OCR pedem
+  `renderer.getData()` na hora.
+- `buildComposition` carrega **uma origem por vez** e a solta após copiar: o pdf-lib copia o
+  conteúdo dos streams ao interpretar e de novo ao copiar páginas.
+- Operação pesada passa `around: usePageMemoryRelease()` à geração: o worker de renderização
+  solta os documentos depois de escolhido o destino e os reabre **depois de gravar**. Pedidos
+  de miniatura nesse intervalo **esperam**, não falham.
+- **"Salvar de novo" nunca guarda bytes**: copia o arquivo já gravado (`copy_saved`). Origem
+  igual ao destino é no-op — abrir em `"wt"` zeraria a origem antes de lê-la.
+- **Régua:** memória privada do processo, numa máquina 64 bits com RAM sobrando, mistura lixo
+  não coletado (o mesmo código deu 1.568 e 1.847 MB). Use
+  `performance.measureUserAgentSpecificMemory()`: exige COOP+COEP e o Chromium completo
+  (`channel: 'chromium'`) — o headless-shell padrão do Playwright não a tem.
+
 **Código**
 
 - **pdf-lib grava todo objeto do contexto, alcançável ou não** — e `context.delete()` foi medido

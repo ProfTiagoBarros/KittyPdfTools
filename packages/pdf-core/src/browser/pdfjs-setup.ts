@@ -138,9 +138,22 @@ class NoFilterFactory {
  * Centralizado de proposito: renderizar e verificar precisam enxergar o mesmo documento. Se a
  * verificacao abrisse sem os assets, ela aprovaria um arquivo que a tela nao consegue desenhar.
  */
-export function pdfjsDocumentOptions(pdf: Uint8Array) {
+export interface DocumentOptionsConfig {
+  /**
+   * Entrega o buffer ao pdf.js em vez de uma copia dele.
+   *
+   * O pdf.js transfere os dados para o seu worker, e quem chamou nao pode mais usa-los. Por
+   * isso o padrao e copiar. Mas copiar tem preco: com um PDF de 150 MB, o worker de
+   * renderizacao guardava o arquivo DUAS vezes (a sua copia e a do pdf.js), e com dois
+   * arquivos abertos eram 287 MB a mais morando no processo sem uso. Quem nao vai reler os
+   * bytes deve adotar, e pedir de volta com `getData()` quando precisar.
+   */
+  readonly adopt?: boolean;
+}
+
+export function pdfjsDocumentOptions(pdf: Uint8Array, config: DocumentOptionsConfig = {}) {
   return {
-    data: new Uint8Array(pdf),
+    data: config.adopt === true ? pdf : new Uint8Array(pdf),
 
     /*
      * Sem `@font-face`, e por isso sem DOM.

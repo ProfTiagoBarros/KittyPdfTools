@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-copy-saved"
+description = "Enables the copy_saved command without any pre-configured scope."
+commands.allow = ["copy_saved"]
+
+[[permission]]
+identifier = "deny-copy-saved"
+description = "Denies the copy_saved command without any pre-configured scope."
+commands.deny = ["copy_saved"]

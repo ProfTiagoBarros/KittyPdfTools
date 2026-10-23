@@ -70,15 +70,17 @@ export function WorkspaceShell({ titleKey, panel, action, main }: WorkspaceShell
       for (const file of files) {
         const documentId = `doc-${(documentCounter += 1)}`;
         try {
-          const bytes = new Uint8Array(await file.arrayBuffer());
+          const original = await file.arrayBuffer();
 
-          // Cada worker recebe a sua copia: a transfer list DESTACA o buffer enviado, e os
-          // dois precisam dos bytes — o de renderizacao para as miniaturas, o de documentos
-          // para compor. E o custo de manter os dois separados.
-          const forRender = bytes.slice().buffer;
-          const forDocuments = bytes.slice().buffer;
+          /*
+           * Cada worker precisa da sua copia — a transfer list DESTACA o buffer enviado —, mas
+           * sao DUAS copias, e nao tres. O original vai inteiro para um worker e so a outra
+           * e fatiada. Antes, o original ficava vivo ao lado de duas fatias: com um PDF de
+           * 150 MB, eram 450 MB so para abrir, e o pico de abertura medido chegava a 1,4 GB.
+           */
+          const forDocuments = original.slice(0);
 
-          const pageCount = await services.render.open(documentId, forRender);
+          const pageCount = await services.render.open(documentId, original);
           await services.documents.load(documentId, forDocuments);
 
           addDocument({ id: documentId, name: file.name, pageCount });

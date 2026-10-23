@@ -53,7 +53,11 @@ export function GenerationAction({
         <Button
           size="sm"
           onClick={generation.saveAgain}
-          title={t('generation.saveAgain')}
+          // Arquivo grande na web: o nome continua visivel, mas nao ha copia para reoferecer.
+          disabled={generation.last.source === null}
+          title={t(
+            generation.last.source === null ? 'generation.tooBigToKeep' : 'generation.saveAgain',
+          )}
           data-testid="last-generated"
           className="max-w-56"
         >

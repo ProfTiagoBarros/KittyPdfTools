@@ -7,7 +7,11 @@ import { cn } from '@/lib/cn';
 import { packVolumes, volumeNames } from 'pdf-core';
 import { toPageRefs } from '@/workspace/model';
 import { useWorkspaceStore } from '@/workspace/store';
-import { useWorkspaceServices, WorkspaceServicesProvider } from '@/workspace/services';
+import {
+  usePageMemoryRelease,
+  useWorkspaceServices,
+  WorkspaceServicesProvider,
+} from '@/workspace/services';
 import type { SplitMode } from '@/workers/documents-protocol';
 import { WorkspaceShell } from './workspace-shell';
 import { useGeneration, type Generation } from '@/lib/generation';
@@ -69,6 +73,8 @@ function SplitProvider({ children }: { children: ReactNode }) {
   const [volumes, setVolumes] = useState(0);
   const [oversizedPages, setOversizedPages] = useState<readonly number[]>([]);
   const generation = useGeneration();
+  // Solta as paginas da renderizacao enquanto o pdf-lib monta o resultado.
+  const pageMemory = usePageMemoryRelease();
 
   const megabytes = Number(sizeMb);
   const canRun =
@@ -95,6 +101,7 @@ function SplitProvider({ children }: { children: ReactNode }) {
 
     generation.run({
       suggestedName: 'pdfkitty-dividido.zip',
+      ...(pageMemory === undefined ? {} : { around: pageMemory }),
       /*
        * Dividir e a unica operacao que produz varios arquivos, e era isso que a mantinha como
        * a excecao da interface. Empacotar devolve a divisao ao mesmo fluxo das outras: uma
@@ -119,7 +126,7 @@ function SplitProvider({ children }: { children: ReactNode }) {
         );
       },
     });
-  }, [services, canRun, mode, pageSpec.resolvedSpec, megabytes, items, generation]);
+  }, [services, canRun, mode, pageSpec.resolvedSpec, megabytes, items, generation, pageMemory]);
 
   const value = useMemo<SplitState>(
     () => ({

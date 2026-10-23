@@ -6,7 +6,11 @@ import { useTranslation } from '@/i18n';
 import { toPageRefs } from '@/workspace/model';
 import { usePageSpec, type PageSpec } from '@/workspace/page-spec';
 import { useWorkspaceStore } from '@/workspace/store';
-import { useWorkspaceServices, WorkspaceServicesProvider } from '@/workspace/services';
+import {
+  usePageMemoryRelease,
+  useWorkspaceServices,
+  WorkspaceServicesProvider,
+} from '@/workspace/services';
 import { useGeneration, type Generation } from '@/lib/generation';
 import { GenerationAction } from './generation-action';
 import { PageRangeField } from './page-range-field';
@@ -41,6 +45,8 @@ function ExtractProvider({ children }: { children: ReactNode }) {
   const items = useWorkspaceStore((state) => state.items);
   const pageSpec = usePageSpec();
   const generation = useGeneration();
+  // Solta as paginas da renderizacao enquanto o pdf-lib monta o resultado.
+  const pageMemory = usePageMemoryRelease();
 
   const canRun =
     services !== null && items.length > 0 && !generation.running && pageSpec.indices.length > 0;
@@ -50,6 +56,7 @@ function ExtractProvider({ children }: { children: ReactNode }) {
 
     generation.run({
       suggestedName: 'pdfkitty-extraido.pdf',
+      ...(pageMemory === undefined ? {} : { around: pageMemory }),
       /*
        * `resolvedSpec` e sempre valido: enquanto se digita, o campo passa por estados que
        * ainda nao descrevem paginas, e nenhum deles pode chegar ao worker.
@@ -57,7 +64,7 @@ function ExtractProvider({ children }: { children: ReactNode }) {
       produce: async () =>
         services.documents.extractComposition(toPageRefs(items), pageSpec.resolvedSpec),
     });
-  }, [services, canRun, pageSpec.resolvedSpec, items, generation]);
+  }, [services, canRun, pageSpec.resolvedSpec, items, generation, pageMemory]);
 
   const value = useMemo<ExtractState>(
     () => ({ pageSpec, generation, run, canRun }),

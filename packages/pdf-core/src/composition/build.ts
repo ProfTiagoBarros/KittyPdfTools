@@ -21,23 +21,32 @@ export async function buildComposition(
     throw coreError('EMPTY_COMPOSITION', {}, 'Composicao vazia');
   }
 
-  const loaded = await loadSources(sources);
+  const byId = indexSources(sources);
+  const plan = planCopies(composition, byId);
   const output = await PDFDocument.create();
 
-  // Copia todas as paginas de uma origem numa unica chamada. Copiar de uma em uma refaz o
-  // grafo de objetos a cada pagina, o que fica lento em documentos grandes.
-  const plan = planCopies(composition, loaded);
+  /*
+   * UMA origem por vez: carrega, copia as paginas pedidas e solta, antes de carregar a
+   * proxima.
+   *
+   * O pdf-lib copia o conteudo de cada stream ao interpretar o arquivo, e copia de novo ao
+   * levar as paginas para o documento novo. Carregando todas as origens antes de copiar,
+   * as versoes interpretadas de TODAS ficavam vivas ate o fim — medido com dois PDFs de 200
+   * paginas: a juncao passava de 1,8 GB, acima do que um Windows 32 bits da a um processo.
+   * Soltando cada origem assim que suas paginas foram copiadas, o coletor de lixo pode
+   * recupera-la antes que a proxima seja aberta e antes de o resultado ser serializado.
+   *
+   * Dentro de cada origem, todas as paginas vao numa unica chamada: copiar de uma em uma
+   * refaz o grafo de objetos a cada pagina, o que fica lento em documentos grandes.
+   */
   const copied = new Map<SourceId, PDFPage[]>();
-  for (const [id, indices] of plan) {
-    const source = loaded.get(id);
-    if (source === undefined) {
-      throw coreError(
-        'INTERNAL',
-        { detail: `origem '${id}' nao carregada` },
-        'Origem nao carregada',
-      );
+  for (const [id, refs] of plan) {
+    const bytes = byId.get(id);
+    if (bytes === undefined) {
+      throw coreError('INTERNAL', { detail: `origem '${id}' ausente` }, 'Origem ausente');
     }
-    copied.set(id, await output.copyPages(source, indices));
+    const source = await PDFDocument.load(bytes);
+    copied.set(id, await output.copyPages(source, validatedIndices(id, refs, source)));
   }
 
   const cursors = new Map<SourceId, number>();
@@ -82,31 +91,35 @@ export async function composeAllPages(sources: readonly SourceDocument[]): Promi
   return refs;
 }
 
-async function loadSources(
-  sources: readonly SourceDocument[],
-): Promise<Map<SourceId, PDFDocument>> {
-  const loaded = new Map<SourceId, PDFDocument>();
+/** Indexa as origens por id, recusando duplicatas sem carregar nenhuma delas. */
+function indexSources(sources: readonly SourceDocument[]): Map<SourceId, Uint8Array> {
+  const byId = new Map<SourceId, Uint8Array>();
 
   for (const source of sources) {
-    if (loaded.has(source.id)) {
+    if (byId.has(source.id)) {
       throw coreError('DUPLICATE_SOURCE', { source: source.id }, `Origem duplicada: ${source.id}`);
     }
-    loaded.set(source.id, await PDFDocument.load(source.bytes));
+    byId.set(source.id, source.bytes);
   }
 
-  return loaded;
+  return byId;
 }
 
-/** Agrupa as paginas pedidas por origem, preservando a ordem em que aparecem. */
+/**
+ * Agrupa as paginas pedidas por origem, preservando a ordem em que aparecem.
+ *
+ * Valida aqui so o que nao exige abrir o arquivo — origem conhecida e rotacao. O intervalo
+ * das paginas depende de quantas o arquivo tem, e e conferido em `validatedIndices`, no
+ * momento em que a origem e carregada.
+ */
 function planCopies(
   composition: Composition,
-  loaded: Map<SourceId, PDFDocument>,
-): Map<SourceId, number[]> {
-  const plan = new Map<SourceId, number[]>();
+  byId: Map<SourceId, Uint8Array>,
+): Map<SourceId, PageRef[]> {
+  const plan = new Map<SourceId, PageRef[]>();
 
   for (const ref of composition) {
-    const source = loaded.get(ref.source);
-    if (source === undefined) {
+    if (!byId.has(ref.source)) {
       throw coreError(
         'UNKNOWN_SOURCE',
         { source: ref.source },
@@ -114,25 +127,32 @@ function planCopies(
       );
     }
 
-    const count = source.getPageCount();
-    if (!Number.isInteger(ref.pageIndex) || ref.pageIndex < 0 || ref.pageIndex >= count) {
-      throw coreError(
-        'PAGE_OUT_OF_RANGE',
-        { source: ref.source, pageIndex: ref.pageIndex, lastIndex: count - 1 },
-        `Pagina ${ref.pageIndex} fora do intervalo de ${ref.source}`,
-      );
-    }
-
     if (ref.rotate !== undefined && ref.rotate % 90 !== 0) {
       throw coreError('INVALID_ROTATION', { rotate: ref.rotate }, 'Rotacao nao multipla de 90');
     }
 
-    const indices = plan.get(ref.source);
-    if (indices === undefined) plan.set(ref.source, [ref.pageIndex]);
-    else indices.push(ref.pageIndex);
+    const refs = plan.get(ref.source);
+    if (refs === undefined) plan.set(ref.source, [ref]);
+    else refs.push(ref);
   }
 
   return plan;
+}
+
+/** Confere cada pagina pedida contra o total real da origem e devolve os indices. */
+function validatedIndices(id: SourceId, refs: readonly PageRef[], source: PDFDocument): number[] {
+  const count = source.getPageCount();
+
+  return refs.map((ref) => {
+    if (!Number.isInteger(ref.pageIndex) || ref.pageIndex < 0 || ref.pageIndex >= count) {
+      throw coreError(
+        'PAGE_OUT_OF_RANGE',
+        { source: id, pageIndex: ref.pageIndex, lastIndex: count - 1 },
+        `Pagina ${ref.pageIndex} fora do intervalo de ${id}`,
+      );
+    }
+    return ref.pageIndex;
+  });
 }
 
 function normalizeAngle(angle: number): number {

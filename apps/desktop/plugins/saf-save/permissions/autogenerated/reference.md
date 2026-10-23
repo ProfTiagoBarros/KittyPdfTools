@@ -5,6 +5,7 @@ Permite gravar no destino escolhido pelo usuario no seletor do sistema.
 #### This default permission set includes the following:
 
 - `allow-save-to-uri`
+- `allow-copy-saved`
 - `allow-discard-uri`
 
 ## Permission Table
@@ -15,6 +16,32 @@ Permite gravar no destino escolhido pelo usuario no seletor do sistema.
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`saf-save:allow-copy-saved`
+
+</td>
+<td>
+
+Enables the copy_saved command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`saf-save:deny-copy-saved`
+
+</td>
+<td>
+
+Denies the copy_saved command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

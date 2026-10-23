@@ -3,7 +3,11 @@
 import { Download } from 'lucide-react';
 import { toPageRefs } from '@/workspace/model';
 import { useWorkspaceStore } from '@/workspace/store';
-import { useWorkspaceServices, WorkspaceServicesProvider } from '@/workspace/services';
+import {
+  usePageMemoryRelease,
+  useWorkspaceServices,
+  WorkspaceServicesProvider,
+} from '@/workspace/services';
 import { WorkspaceShell } from './workspace-shell';
 import { useGeneration } from '@/lib/generation';
 import { GenerationAction } from './generation-action';
@@ -14,6 +18,8 @@ function ExportAction() {
   const services = useWorkspaceServices();
   const items = useWorkspaceStore((state) => state.items);
   const generation = useGeneration();
+  // Solta as paginas da renderizacao enquanto o pdf-lib monta o resultado.
+  const pageMemory = usePageMemoryRelease();
 
   return (
     <GenerationAction
@@ -26,6 +32,7 @@ function ExportAction() {
       onRun={() =>
         generation.run({
           suggestedName: 'pdfkitty.pdf',
+          ...(pageMemory === undefined ? {} : { around: pageMemory }),
           // Compor nao sabe estimar o quanto falta: a interface mostra atividade, sem
           // porcentagem, em vez de uma barra fingindo saber.
           produce: async () => {

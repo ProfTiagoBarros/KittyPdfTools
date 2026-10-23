@@ -2,12 +2,44 @@
 
 import { useCallback, useState } from 'react';
 import { coreErrorKey, coreErrorParams, useTranslation } from '@/i18n';
-import { chooseDestination, discardDestination, savePdf, writeTo } from './save-pdf';
+import {
+  chooseDestination,
+  copySaved,
+  discardDestination,
+  savePdf,
+  writeTo,
+  type Destination,
+} from './save-pdf';
 
-/** Arquivo que a ferramenta acabou de produzir e que o usuario ainda pode salvar de novo. */
+/**
+ * De onde o "salvar de novo" tira o arquivo.
+ *
+ * NAO e o arquivo em si. Guardar os bytes custava o tamanho inteiro do documento enquanto o
+ * app estivesse aberto — medido, 288 MB depois de juntar dois PDFs de 200 paginas —, e cada
+ * operacao seguinte comecava desse patamar. Num Windows 32 bits, com ~2 GB por processo, era
+ * a diferenca entre a segunda juncao funcionar ou travar.
+ *
+ * - `disk`: o app instalado ja gravou o arquivo; salvar de novo e copiar de la.
+ * - `memory`: a web nao rele o que baixou, entao guarda — mas so arquivos pequenos.
+ * - `null`: arquivo grande na web; da para ver o nome, nao para salvar de novo.
+ */
+export type LastSource =
+  | { readonly kind: 'disk'; readonly path: string }
+  | { readonly kind: 'memory'; readonly bytes: Uint8Array }
+  | null;
+
+/** Arquivo que a ferramenta acabou de produzir. */
 export interface LastGenerated {
   readonly name: string;
-  readonly bytes: Uint8Array;
+  readonly source: LastSource;
+}
+
+/** Acima disto, a web nao guarda o arquivo para salvar de novo. */
+const MAX_KEPT_IN_MEMORY = 50 * 1024 * 1024;
+
+function sourceFor(destination: Destination, bytes: Uint8Array): LastSource {
+  if (destination.kind === 'system') return { kind: 'disk', path: destination.path };
+  return bytes.length <= MAX_KEPT_IN_MEMORY ? { kind: 'memory', bytes } : null;
 }
 
 export interface Generation {
@@ -22,6 +54,12 @@ export interface Generation {
   readonly saveAgain: () => void;
 }
 
+/** O que fazer em volta de uma geracao pesada: liberar antes, restaurar depois. */
+export interface GenerationAround {
+  readonly before: () => Promise<void>;
+  readonly after: () => Promise<void>;
+}
+
 export interface RunOptions {
   /** Nome sugerido no seletor. O usuario pode trocar. */
   readonly suggestedName: string;
@@ -34,6 +72,15 @@ export interface RunOptions {
    * pacote.
    */
   readonly produce: (report: (fraction: number) => void, fileName: string) => Promise<Uint8Array>;
+  /**
+   * Liberacao de memoria em volta da geracao.
+   *
+   * `before` roda depois de o destino ser escolhido — cancelar o seletor nao deve custar uma
+   * recarga — e `after` roda depois de o arquivo estar GRAVADO, inclusive quando a geracao
+   * falha. Restaurar antes de gravar somaria a recarga ao arquivo gerado, ainda vivo na
+   * memoria, que e exatamente o pico que a liberacao existe para evitar.
+   */
+  readonly around?: GenerationAround;
 }
 
 /**
@@ -60,7 +107,7 @@ export function useGeneration(): Generation {
   const [last, setLast] = useState<LastGenerated | null>(null);
 
   const run = useCallback(
-    ({ suggestedName, produce }: RunOptions) => {
+    ({ suggestedName, produce, around }: RunOptions) => {
       if (running) return;
 
       setError(null);
@@ -78,10 +125,21 @@ export function useGeneration(): Generation {
         setRunning(true);
         setProgress(null);
 
+        let liberado = false;
         try {
+          if (around !== undefined) {
+            try {
+              await around.before();
+              liberado = true;
+            } catch (cause) {
+              // Liberar e otimizacao: se falhar, a geracao segue com a memoria como esta.
+              console.error('Falha ao liberar memoria antes de gerar', cause);
+            }
+          }
+
           const bytes = await produce((fraction) => setProgress(fraction), name);
           await writeTo(destination, bytes);
-          setLast({ name, bytes });
+          setLast({ name, source: sourceFor(destination, bytes) });
         } catch (cause) {
           // A causa vai ao console porque a mensagem na tela e traduzida e generica por
           // design; sem ela, "nao foi possivel" e tudo o que se sabe quando o defeito e nosso.
@@ -91,6 +149,11 @@ export function useGeneration(): Generation {
             console.error('Falha ao descartar o destino vazio', erro);
           });
         } finally {
+          if (liberado && around !== undefined) {
+            await around.after().catch((cause: unknown) => {
+              console.error('Falha ao restaurar as paginas apos gerar', cause);
+            });
+          }
           setRunning(false);
           setProgress(null);
         }
@@ -100,12 +163,28 @@ export function useGeneration(): Generation {
   );
 
   const saveAgain = useCallback(() => {
-    if (last === null) return;
+    if (last?.source == null) return;
+    const { name, source } = last;
 
     setError(null);
-    void savePdf(last.bytes, last.name).catch((cause: unknown) => {
-      console.error('Falha ao salvar novamente', { name: last.name }, cause);
-      setError(t('save.failed'));
+
+    if (source.kind === 'memory') {
+      void savePdf(source.bytes, name).catch((cause: unknown) => {
+        console.error('Falha ao salvar novamente', { name }, cause);
+        setError(t('save.failed'));
+      });
+      return;
+    }
+
+    void (async () => {
+      const destination = await chooseDestination(name).catch(() => null);
+      if (destination === null) return;
+      await copySaved(source.path, destination);
+    })().catch((cause: unknown) => {
+      // O caso real e o arquivo ter sido movido ou apagado depois de salvo: a mensagem diz
+      // isso e sugere gerar de novo, em vez de um "nao foi possivel" sem saida.
+      console.error('Falha ao copiar o arquivo salvo', { name }, cause);
+      setError(t('generation.copyFailed'));
     });
   }, [last, t]);
 

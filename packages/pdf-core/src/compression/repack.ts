@@ -1,10 +1,4 @@
-import {
-  PDFArray,
-  PDFDocument,
-  PDFName,
-  PDFRawStream,
-  decodePDFRawStream,
-} from '@cantoo/pdf-lib';
+import { PDFArray, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from '@cantoo/pdf-lib';
 import { coreError } from '../errors';
 import { stripInvisibleText } from './invisible-text';
 

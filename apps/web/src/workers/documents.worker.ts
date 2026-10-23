@@ -73,6 +73,12 @@ async function handle(request: Exclude<DocumentRequest, { kind: 'cancel' }>): Pr
         return;
       }
 
+      case 'copy': {
+        const copia = requireDocument(request.documentId).slice().buffer;
+        reply({ kind: 'copied', id: request.id, bytes: copia }, [copia]);
+        return;
+      }
+
       case 'unload': {
         documents.delete(request.documentId);
         reply({ kind: 'unloaded', id: request.id });

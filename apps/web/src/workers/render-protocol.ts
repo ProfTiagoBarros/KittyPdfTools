@@ -65,6 +65,20 @@ export interface CompressRequest {
   readonly mode: CompressMode;
 }
 
+/**
+ * Solta todos os documentos abertos no pdf.js, ate a tela reabri-los.
+ *
+ * Existe para as operacoes pesadas — juntar, dividir, extrair, compactar. Elas acontecem no
+ * worker de documentos, mas dividem o MESMO processo com este worker: num Windows 32 bits o
+ * conjunto tem ~2 GB. Enquanto o pdf-lib monta o resultado, a copia do pdf.js aqui fica parada
+ * ocupando o tamanho inteiro de cada arquivo. Solta-la durante a operacao e o que mantem o
+ * pico abaixo do limite.
+ */
+export interface ReleaseRequest {
+  readonly kind: 'release';
+  readonly id: string;
+}
+
 export interface OcrRequest {
   readonly kind: 'ocr';
   readonly id: string;
@@ -87,6 +101,7 @@ export type RenderRequest =
   | ThumbnailRequest
   | RedactRequest
   | CompressRequest
+  | ReleaseRequest
   | OcrRequest
   | PageTextsRequest;
 
@@ -118,6 +133,11 @@ export interface RedactedMessage {
   readonly kind: 'redacted';
   readonly id: string;
   readonly pdf: ArrayBuffer;
+}
+
+export interface ReleasedMessage {
+  readonly kind: 'released';
+  readonly id: string;
 }
 
 export interface CompressedMessage {
@@ -161,6 +181,7 @@ export type RenderResponse =
   | ThumbnailMessage
   | RedactedMessage
   | CompressedMessage
+  | ReleasedMessage
   | OcrDoneMessage
   | ProgressMessage
   | CancelledMessage
@@ -172,6 +193,7 @@ const RESPONSE_KINDS = new Set([
   'thumbnail',
   'redacted',
   'compressed',
+  'released',
   'ocrDone',
   'pageTexts',
   'progress',

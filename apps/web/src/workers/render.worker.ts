@@ -28,7 +28,11 @@ configurePdfjs(new URL('/pdfjs/', self.location.origin).href);
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
 interface OpenDocument {
-  readonly bytes: Uint8Array;
+  /*
+   * Sem `bytes`, de proposito: o pdf.js ja guarda o arquivo. Manter uma segunda copia aqui
+   * custava o tamanho inteiro de cada documento aberto — medido, 287 MB com dois arquivos
+   * de 200 paginas. Ofuscar e OCR pedem os bytes com `renderer.getData()` quando rodam.
+   */
   readonly renderer: DocumentRenderer;
   /** Texto por pagina, extraido sob demanda na primeira busca e reaproveitado depois. */
   readonly texts?: readonly string[];
@@ -57,11 +61,11 @@ async function handle(request: RenderRequest): Promise<void> {
   try {
     switch (request.kind) {
       case 'open': {
-        const bytes = new Uint8Array(request.bytes);
-        const renderer = await openForRendering(bytes);
+        // `adopt`: o buffer transferido pela tela vai direto para o pdf.js, sem copia.
+        const renderer = await openForRendering(new Uint8Array(request.bytes), { adopt: true });
         // Substituir um id ja aberto sem fechar o anterior vazaria o documento do pdf.js.
         await documents.get(request.documentId)?.renderer.dispose();
-        documents.set(request.documentId, { bytes, renderer });
+        documents.set(request.documentId, { renderer });
         reply({
           kind: 'opened',
           id: request.id,
@@ -118,6 +122,13 @@ async function handle(request: RenderRequest): Promise<void> {
         return;
       }
 
+      case 'release': {
+        for (const open of documents.values()) await open.renderer.dispose();
+        documents.clear();
+        reply({ kind: 'released', id: request.id });
+        return;
+      }
+
       case 'compress': {
         await runCompress(request);
         return;
@@ -130,7 +141,8 @@ async function handle(request: RenderRequest): Promise<void> {
 
       case 'redact': {
         const open = requireDocument(request.documentId);
-        const result = await redactByRasterizing(open.bytes, request.areas, open.renderer, {
+        const bytes = await open.renderer.getData();
+        const result = await redactByRasterizing(bytes, request.areas, open.renderer, {
           ...(request.scale === undefined ? {} : { scale: request.scale }),
           onProgress: (completed, total) =>
             reply({ kind: 'progress', id: request.id, completed, total }),
@@ -285,7 +297,10 @@ async function runOcr(request: Extract<RenderRequest, { kind: 'ocr' }>): Promise
     await engine?.terminate();
   }
 
-  const { pdf, report: layer } = await addInvisibleTextLayer(open.bytes, results);
+  const { pdf, report: layer } = await addInvisibleTextLayer(
+    await open.renderer.getData(),
+    results,
+  );
   const buffer = toTransferable(pdf);
 
   reply(

@@ -59,6 +59,14 @@ struct CopyToUriPayload {
 #[cfg(target_os = "android")]
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct CopySavedPayload {
+    source: String,
+    destination: String,
+}
+
+#[cfg(target_os = "android")]
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DiscardPayload {
     destination: String,
 }
@@ -112,6 +120,41 @@ async fn discard_uri<R: Runtime>(app: AppHandle<R>, destination: String) -> Resu
     discard(&app, &destination)
 }
 
+/**
+ * Copia um arquivo ja gravado para um novo destino — o "salvar de novo".
+ *
+ * Existe para a interface NAO guardar o documento gerado na memoria. Guardar custava o
+ * tamanho inteiro do arquivo enquanto o app estivesse aberto (288 MB depois de juntar dois
+ * PDFs de 200 paginas), e cada operacao seguinte comecava desse patamar — num Windows 32 bits,
+ * com ~2 GB por processo, isso era a diferenca entre a segunda juncao funcionar ou travar.
+ *
+ * Origem igual ao destino nao faz nada, de proposito: abrir o destino para escrita o
+ * TRUNCA, e sendo o mesmo arquivo, a origem seria zerada antes de ser lida.
+ */
+#[tauri::command]
+async fn copy_saved<R: Runtime>(
+    app: AppHandle<R>,
+    source: String,
+    destination: String,
+) -> Result<()> {
+    if source == destination {
+        return Ok(());
+    }
+    copy_saved_file(&app, &source, &destination)
+}
+
+#[cfg(not(target_os = "android"))]
+fn copy_saved_file<R: Runtime>(_app: &AppHandle<R>, source: &str, destination: &str) -> Result<()> {
+    std::fs::copy(source, destination)?;
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn copy_saved_file<R: Runtime>(app: &AppHandle<R>, source: &str, destination: &str) -> Result<()> {
+    // No Android os dois lados sao content URIs: quem le e escreve e o content resolver.
+    app.saf_save().copy_saved(source.to_string(), destination.to_string())
+}
+
 #[cfg(not(target_os = "android"))]
 fn discard<R: Runtime>(_app: &AppHandle<R>, _destination: &str) -> Result<()> {
     Ok(())
@@ -157,7 +200,7 @@ fn write_bytes<R: Runtime>(app: &AppHandle<R>, destination: &str, bytes: &[u8]) 
 
 #[cfg(target_os = "android")]
 mod android {
-    use super::{CopyToUriPayload, DiscardPayload, Error, Result};
+    use super::{CopySavedPayload, CopyToUriPayload, DiscardPayload, Error, Result};
     use tauri::{
         plugin::{PluginApi, PluginHandle},
         AppHandle, Manager, Runtime,
@@ -173,6 +216,18 @@ mod android {
                 .run_mobile_plugin::<()>(
                     "copyToUri",
                     CopyToUriPayload {
+                        source,
+                        destination,
+                    },
+                )
+                .map_err(|error| Error::Io(std::io::Error::other(error.to_string())))
+        }
+
+        pub fn copy_saved(&self, source: String, destination: String) -> Result<()> {
+            self.0
+                .run_mobile_plugin::<()>(
+                    "copySaved",
+                    CopySavedPayload {
                         source,
                         destination,
                     },
@@ -214,7 +269,7 @@ use android::SafSaveExt;
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("saf-save")
-        .invoke_handler(tauri::generate_handler![save_to_uri, discard_uri])
+        .invoke_handler(tauri::generate_handler![save_to_uri, copy_saved, discard_uri])
         .setup(|_app, _api| {
             #[cfg(target_os = "android")]
             {

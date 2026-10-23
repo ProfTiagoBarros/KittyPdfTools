@@ -99,6 +99,27 @@ export interface RenderWorkspace {
    * tecla faria o pdf.js reinterpretar o documento inteiro a cada letra.
    */
   pageTexts(documentId: string): Promise<readonly string[]>;
+  /**
+   * Solta os documentos do pdf.js ate `restore`.
+   *
+   * As miniaturas ja desenhadas FICAM no cache: sao bitmaps pequenos e independentes do
+   * documento, e descarta-las faria a grade piscar sem ganho de memoria que valha.
+   *
+   * Enquanto estiver liberado, pedidos que precisam do documento — miniatura nova, texto,
+   * ofuscar, OCR — ESPERAM, em vez de falhar. Falhar encheria a grade de folhas em branco e o
+   * console de erros durante uma juncao que esta indo bem.
+   */
+  release(): Promise<void>;
+  /**
+   * Reabre os documentos, um de cada vez, e libera quem estava esperando.
+   *
+   * Um de cada vez de proposito: buscar todas as copias antes de abrir somaria todos os
+   * arquivos de uma vez na memoria, logo depois do pico que a liberacao queria evitar.
+   */
+  restore(
+    documentIds: readonly string[],
+    loadBytes: (documentId: string) => Promise<ArrayBuffer>,
+  ): Promise<void>;
   /** Numero de miniaturas vivas no cache. Existe para os testes observarem o descarte. */
   cachedThumbnails(): number;
   dispose(): void;
@@ -177,6 +198,11 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
     }
   }
 
+  /** Pendente enquanto os documentos estao liberados; `null` quando estao abertos. */
+  let paused: Promise<void> | null = null;
+  let resume: (() => void) | undefined;
+  const whenOpen = () => paused ?? Promise.resolve();
+
   return {
     async open(documentId, bytes) {
       dropDocument(documentId);
@@ -207,20 +233,23 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
       const pending = inFlight.get(key);
       if (pending !== undefined) return pending;
 
-      const request = send(
-        { kind: 'thumbnail', id: newId(), documentId, pageIndex, maxEdge: edge },
-        [],
-        (message) =>
-          message.kind === 'thumbnail'
-            ? {
-                bitmap: message.bitmap,
-                widthPx: message.widthPx,
-                heightPx: message.heightPx,
-                widthPt: message.widthPt,
-                heightPt: message.heightPt,
-              }
-            : undefined,
-      )
+      const request = whenOpen()
+        .then(() =>
+          send(
+            { kind: 'thumbnail', id: newId(), documentId, pageIndex, maxEdge: edge },
+            [],
+            (message) =>
+              message.kind === 'thumbnail'
+                ? {
+                    bitmap: message.bitmap,
+                    widthPx: message.widthPx,
+                    heightPx: message.heightPx,
+                    widthPt: message.widthPt,
+                    heightPt: message.heightPt,
+                  }
+                : undefined,
+          ),
+        )
         .then((thumbnail) => {
           cache.set(key, thumbnail);
           evictIfNeeded();
@@ -241,9 +270,12 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
       const pending = textsInFlight.get(documentId);
       if (pending !== undefined) return pending;
 
-      const request = send({ kind: 'pageTexts', id: newId(), documentId }, [], (message) =>
-        message.kind === 'pageTexts' ? message.texts : undefined,
-      )
+      const request = whenOpen()
+        .then(() =>
+          send({ kind: 'pageTexts', id: newId(), documentId }, [], (message) =>
+            message.kind === 'pageTexts' ? message.texts : undefined,
+          ),
+        )
         .then((result) => {
           texts.set(documentId, result);
           return result;
@@ -275,6 +307,7 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
     },
 
     async redact(documentId, areas, options = {}) {
+      await whenOpen();
       const pdf = await send(
         {
           kind: 'redact',
@@ -291,6 +324,7 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
     },
 
     async ocr(documentId, options = {}) {
+      await whenOpen();
       const result = await send(
         {
           kind: 'ocr',
@@ -311,6 +345,43 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
         wordsWritten: result.wordsWritten,
         wordsSkipped: result.wordsSkipped,
       };
+    },
+
+    async release() {
+      if (paused !== null) return;
+      paused = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+
+      // Deixa terminar o que ja foi enviado: uma miniatura em voo para um documento que acabou
+      // de ser solto falharia, e o cartao ficaria em branco ate a proxima rolagem.
+      await Promise.allSettled([...inFlight.values()]);
+
+      await send({ kind: 'release', id: newId() }, [], (message) =>
+        message.kind === 'released' ? true : undefined,
+      );
+    },
+
+    async restore(documentIds, loadBytes) {
+      try {
+        for (const documentId of documentIds) {
+          try {
+            const bytes = await loadBytes(documentId);
+            // Sem `dropDocument`: as miniaturas em cache continuam validas.
+            await send({ kind: 'open', id: newId(), documentId, bytes }, [bytes], (message) =>
+              message.kind === 'opened' ? true : undefined,
+            );
+          } catch (cause) {
+            // Um documento que nao reabre nao pode prender os outros nem a tela inteira.
+            console.error('Falha ao reabrir o documento apos a operacao', { documentId }, cause);
+          }
+        }
+      } finally {
+        const liberar = resume;
+        paused = null;
+        resume = undefined;
+        liberar?.();
+      }
     },
 
     cachedThumbnails: () => cache.size,

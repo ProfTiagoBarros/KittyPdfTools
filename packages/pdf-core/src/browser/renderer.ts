@@ -1,5 +1,5 @@
 import { getDocument } from 'pdfjs-dist';
-import { pdfjsDocumentOptions } from './pdfjs-setup';
+import { pdfjsDocumentOptions, type DocumentOptionsConfig } from './pdfjs-setup';
 import { paintBlackout } from '../redaction/blackout';
 import type { PageRasterizer, RasterizeRequest, RasterPage } from '../redaction/types';
 import { coreError } from '../errors';
@@ -38,6 +38,15 @@ export interface DocumentRenderer extends PageRasterizer {
    * mais lenta do produto, e digitalizar o que ja esta digital nao acrescenta nada.
    */
   hasText(pageIndex: number): Promise<boolean>;
+  /**
+   * Os bytes originais do documento, pedidos ao pdf.js na hora.
+   *
+   * Existe para que ninguem precise guardar uma segunda copia "por via das duvidas": quem
+   * abre com `adopt` entrega o buffer ao pdf.js e, nas raras operacoes que precisam do
+   * arquivo inteiro (ofuscar, gravar a camada de OCR), pede de volta. A copia devolvida e
+   * temporaria e morre com a operacao.
+   */
+  getData(): Promise<Uint8Array>;
   dispose(): Promise<void>;
 }
 
@@ -47,14 +56,18 @@ export interface DocumentRenderer extends PageRasterizer {
  * Reabrir por pagina faria o pdf.js reinterpretar o arquivo a cada miniatura — inviavel numa
  * grade que rola por centenas de paginas.
  */
-export async function openForRendering(pdf: Uint8Array): Promise<DocumentRenderer> {
-  const task = getDocument(pdfjsDocumentOptions(pdf));
+export async function openForRendering(
+  pdf: Uint8Array,
+  config: DocumentOptionsConfig = {},
+): Promise<DocumentRenderer> {
+  const task = getDocument(pdfjsDocumentOptions(pdf, config));
   const document = await task.promise;
 
   /** Declarada a parte para que `hasText` a chame sem depender de `this` no objeto devolvido. */
   async function textOf(pageIndex: number): Promise<string> {
     const page = await document.getPage(pageIndex + 1);
     const content = await page.getTextContent();
+    page.cleanup();
 
     // Quebra de linha marcada pelo proprio pdf.js. Nao insira separador entre os demais
     // itens: uma palavra frequentemente chega partida em varios (kerning, mudanca de fonte),
@@ -92,6 +105,20 @@ export async function openForRendering(pdf: Uint8Array): Promise<DocumentRendere
     }).promise;
 
     if (blackout.length > 0) paintBlackout(context, viewport, blackout);
+
+    /*
+     * Os pixels ja estao no canvas: o que o pdf.js guardou para desenha-los nao serve mais.
+     *
+     * Sem isto, cada pagina desenhada deixava a imagem DECODIFICADA no cache do pdf.js — numa
+     * pagina escaneada, uns 8 MB em RGBA. Medido com dois PDFs de 200 paginas: so rolar a
+     * grade somava 1 GB ao processo, e num Windows 32 bits (~2 GB por processo) o app morria
+     * antes de o usuario chegar a juntar nada. A proxima vez que a pagina for pedida, o
+     * pdf.js a decodifica de novo: troca memoria por um pouco de CPU, que e o lado certo.
+     *
+     * `cleanup` e seguro com outro desenho da mesma pagina em andamento: o pdf.js adia a
+     * limpeza ate ele terminar.
+     */
+    page.cleanup();
 
     return { canvas, context, viewport, unscaled };
   }
@@ -141,6 +168,8 @@ export async function openForRendering(pdf: Uint8Array): Promise<DocumentRendere
     async hasText(pageIndex: number): Promise<boolean> {
       return (await textOf(pageIndex)).trim().length > 0;
     },
+
+    getData: () => document.getData(),
 
     dispose: () => task.destroy(),
   };

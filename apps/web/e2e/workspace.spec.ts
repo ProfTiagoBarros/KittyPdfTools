@@ -378,7 +378,8 @@ test('trocar de ferramenta preserva os arquivos e as miniaturas', async ({ page 
 test('o arquivo gerado continua ao alcance para salvar de novo', async ({ page }) => {
   /*
    * "Ultima geracao" existe para o caso real de salvar no lugar errado — ou de querer uma
-   * segunda copia — sem refazer o trabalho. Os bytes ficam em memoria ate a proxima geracao.
+   * segunda copia — sem refazer o trabalho. Na web, arquivos pequenos ficam em memoria; no app
+   * instalado, salvar de novo copia o arquivo ja gravado, sem reter nada.
    */
   await attach(page, 'contrato.pdf', 2);
   await expect(cards(page)).toHaveCount(2);

@@ -9,7 +9,11 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { toPageRefs } from '@/workspace/model';
 import { useWorkspaceStore } from '@/workspace/store';
-import { useWorkspaceServices, WorkspaceServicesProvider } from '@/workspace/services';
+import {
+  usePageMemoryRelease,
+  useWorkspaceServices,
+  WorkspaceServicesProvider,
+} from '@/workspace/services';
 import { useGeneration, type Generation } from '@/lib/generation';
 import type { CompressMode } from '@/workers/render-client';
 import { GenerationAction } from './generation-action';
@@ -100,6 +104,8 @@ function CompressProvider({ children }: { children: ReactNode }) {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [confirming, setConfirming] = useState(false);
   const generation = useGeneration();
+  // Solta as paginas da renderizacao enquanto o pdf-lib monta o resultado.
+  const pageMemory = usePageMemoryRelease();
 
   const megabytes = Number(targetMb);
   const lossy = mode !== 'lossless';
@@ -127,6 +133,7 @@ function CompressProvider({ children }: { children: ReactNode }) {
 
     generation.run({
       suggestedName: 'pdfkitty-compactado.pdf',
+      ...(pageMemory === undefined ? {} : { around: pageMemory }),
       produce: async (report) => {
         /*
          * Compacta a COMPOSICAO da grade, e nao um arquivo de origem: quem juntou paginas de
@@ -153,7 +160,7 @@ function CompressProvider({ children }: { children: ReactNode }) {
         return resultado.pdf;
       },
     });
-  }, [services, canRun, mode, removeOcr, preset, megabytes, items, generation]);
+  }, [services, canRun, mode, removeOcr, preset, megabytes, items, generation, pageMemory]);
 
   const request = useCallback(() => {
     if (!canRun) return;

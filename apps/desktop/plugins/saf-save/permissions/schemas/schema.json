@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the copy_saved command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-copy-saved",
+          "markdownDescription": "Enables the copy_saved command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the copy_saved command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-copy-saved",
+          "markdownDescription": "Denies the copy_saved command without any pre-configured scope."
+        },
+        {
           "description": "Enables the discard_uri command without any pre-configured scope.",
           "type": "string",
           "const": "allow-discard-uri",
@@ -319,10 +331,10 @@
           "markdownDescription": "Denies the save_to_uri command without any pre-configured scope."
         },
         {
-          "description": "Permite gravar no destino escolhido pelo usuario no seletor do sistema.\n#### This default permission set includes:\n\n- `allow-save-to-uri`\n- `allow-discard-uri`",
+          "description": "Permite gravar no destino escolhido pelo usuario no seletor do sistema.\n#### This default permission set includes:\n\n- `allow-save-to-uri`\n- `allow-copy-saved`\n- `allow-discard-uri`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Permite gravar no destino escolhido pelo usuario no seletor do sistema.\n#### This default permission set includes:\n\n- `allow-save-to-uri`\n- `allow-discard-uri`"
+          "markdownDescription": "Permite gravar no destino escolhido pelo usuario no seletor do sistema.\n#### This default permission set includes:\n\n- `allow-save-to-uri`\n- `allow-copy-saved`\n- `allow-discard-uri`"
         }
       ]
     }

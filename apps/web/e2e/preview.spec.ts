@@ -195,3 +195,30 @@ test('a pagina aparece desenhada, e nao so a moldura', async ({ page }) => {
     .evaluate((canvas: HTMLCanvasElement) => canvas.width);
   expect(largura).toBeGreaterThan(600);
 });
+
+/**
+ * Juntar solta os documentos da renderizacao para caber na memoria de um Windows 32 bits, e
+ * os reabre depois de gravar. Se a reabertura falhasse, a grade continuaria mostrando as
+ * miniaturas do cache — e o defeito so apareceria na proxima pagina NOVA a ser desenhada.
+ *
+ * Por isso o teste abre a lupa: ela pede uma imagem de 1400 px que nunca passou pelo cache da
+ * grade, e so a recebe se o documento tiver voltado a existir no pdf.js.
+ */
+test('depois de juntar, as paginas voltam a ser desenhadas', async ({ page }) => {
+  await requireOffscreenCanvas(page);
+
+  await attach(page, 'a.pdf', 3);
+  await expect(cards(page)).toHaveCount(3);
+
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export').click();
+  await download;
+  await expect(page.getByTestId('export')).toHaveAttribute('aria-busy', 'false');
+
+  await abrirLupa(page, 1);
+  await expect(page.getByTestId('preview-status')).toHaveCount(0);
+  const largura = await page
+    .getByTestId('preview-canvas')
+    .evaluate((canvas: HTMLCanvasElement) => canvas.width);
+  expect(largura).toBeGreaterThan(600);
+});

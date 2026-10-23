@@ -81,6 +81,10 @@ export const en: Messages = {
 
   'error.loadFailed': 'Could not read {file}. The file may be damaged or protected.',
   'save.failed': 'Could not save the file.',
+  'generation.copyFailed':
+    'Could not find the saved file. It may have been moved or deleted; generate again for another copy.',
+  'generation.tooBigToKeep':
+    'File too large to keep in the browser memory. Generate again for another copy.',
   'generation.saveAgain': 'Last generated file — click to save it again',
 
   'split.mode': 'Split mode',
