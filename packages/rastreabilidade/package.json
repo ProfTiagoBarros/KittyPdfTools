@@ -1,0 +1,23 @@
+{
+  "name": "rastreabilidade",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Matriz de rastreabilidade: requisito -> funcionalidade -> codigo -> testes, e o calculo de impacto de uma mudanca.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "gerar": "node src/gerar.ts",
+    "impacto": "node src/impacto.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.4.0",
+    "eslint": "10.9.1",
+    "globals": "17.11.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.68.0",
+    "vitest": "4.1.11"
+  }
+}

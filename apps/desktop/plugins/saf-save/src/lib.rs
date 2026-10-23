@@ -81,28 +81,37 @@ async fn save_to_uri<R: Runtime>(app: AppHandle<R>, request: Request<'_>) -> Res
         .ok_or(Error::MissingDestination)?
         .to_string();
 
-    /*
-     * Duas formas, porque o transporte muda com a plataforma.
-     *
-     * No desktop os bytes chegam como corpo binario. **No Android chegam como array JSON de
-     * numeros** — o proprio `tauri-plugin-fs` trata os dois casos, e aceitar so o binario faz
-     * o comando falhar sempre no celular, que foi exatamente o que aconteceu aqui.
-     *
-     * O custo do caminho JSON e alto (um PDF de 5 MB viaja como texto de dezenas de MB), mas
-     * quem escolhe o transporte e o Tauri, nao nos.
-     */
-    let bytes: Cow<[u8]> = match request.body() {
-        InvokeBody::Raw(dados) => Cow::Borrowed(dados.as_slice()),
-        InvokeBody::Json(serde_json::Value::Array(valores)) => Cow::Owned(
-            valores
-                .iter()
-                .filter_map(|valor| valor.as_u64().map(|numero| numero as u8))
-                .collect(),
-        ),
-        _ => return Err(Error::SemBytes),
-    };
-
+    // O custo do caminho JSON do Android e alto (um PDF de 5 MB viaja como texto de dezenas
+    // de MB), mas quem escolhe o transporte e o Tauri, nao nos.
+    let bytes = bytes_from_body(request.body())?;
     write_bytes(&app, &destination, &bytes)
+}
+
+/**
+ * Os bytes do corpo da requisicao, nas duas formas em que o Tauri os entrega.
+ *
+ * No desktop chegam como corpo binario. **No Android chegam como array JSON de numeros** — o
+ * proprio `tauri-plugin-fs` trata os dois casos, e aceitar so o binario faz o comando falhar
+ * sempre no celular, que foi exatamente o que aconteceu aqui.
+ *
+ * Um valor do array que nao seja um byte recusa o corpo inteiro: descarta-lo ou trunca-lo
+ * gravaria um PDF corrompido sem aviso nenhum.
+ */
+fn bytes_from_body(body: &InvokeBody) -> Result<Cow<'_, [u8]>> {
+    match body {
+        InvokeBody::Raw(dados) => Ok(Cow::Borrowed(dados.as_slice())),
+        InvokeBody::Json(serde_json::Value::Array(valores)) => valores
+            .iter()
+            .map(|valor| {
+                valor
+                    .as_u64()
+                    .and_then(|numero| u8::try_from(numero).ok())
+                    .ok_or(Error::SemBytes)
+            })
+            .collect::<Result<Vec<u8>>>()
+            .map(Cow::Owned),
+        _ => Err(Error::SemBytes),
+    }
 }
 
 /**
@@ -145,8 +154,7 @@ async fn copy_saved<R: Runtime>(
 
 #[cfg(not(target_os = "android"))]
 fn copy_saved_file<R: Runtime>(_app: &AppHandle<R>, source: &str, destination: &str) -> Result<()> {
-    std::fs::copy(source, destination)?;
-    Ok(())
+    disk::copy(std::path::Path::new(source), std::path::Path::new(destination))
 }
 
 #[cfg(target_os = "android")]
@@ -167,8 +175,39 @@ fn discard<R: Runtime>(app: &AppHandle<R>, destination: &str) -> Result<()> {
 
 #[cfg(not(target_os = "android"))]
 fn write_bytes<R: Runtime>(_app: &AppHandle<R>, destination: &str, bytes: &[u8]) -> Result<()> {
-    std::fs::write(destination, bytes)?;
-    Ok(())
+    disk::write(std::path::Path::new(destination), bytes)
+}
+
+/// Gravacao no desktop, onde o destino e um caminho comum. Separada do `AppHandle` para ser
+/// testavel sem subir o Tauri.
+#[cfg(not(target_os = "android"))]
+mod disk {
+    use super::Result;
+    use std::path::Path;
+
+    pub fn write(destination: &Path, bytes: &[u8]) -> Result<()> {
+        std::fs::write(destination, bytes)?;
+        Ok(())
+    }
+
+    /// Copia o arquivo salvo. O mesmo arquivo nao e copiado sobre si mesmo: abrir o destino
+    /// para escrita o trunca, e a origem seria zerada antes de ser lida. A comparacao e pelo
+    /// caminho canonico porque `C:\a.pdf` e `c:\A.PDF` sao o mesmo arquivo no Windows.
+    pub fn copy(source: &Path, destination: &Path) -> Result<()> {
+        if same_file(source, destination) {
+            return Ok(());
+        }
+        std::fs::copy(source, destination)?;
+        Ok(())
+    }
+
+    fn same_file(a: &Path, b: &Path) -> bool {
+        match (a.canonicalize(), b.canonicalize()) {
+            (Ok(a), Ok(b)) => a == b,
+            // O destino ainda nao existe: nao pode ser a origem.
+            _ => false,
+        }
+    }
 }
 
 #[cfg(target_os = "android")]
@@ -279,4 +318,86 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             Ok(())
         })
         .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn corpo_binario_passa_sem_copia() {
+        let corpo = InvokeBody::Raw(vec![0x25, 0x50, 0x44, 0x46]);
+        let bytes = bytes_from_body(&corpo).unwrap();
+        assert!(matches!(bytes, Cow::Borrowed(_)));
+        assert_eq!(&*bytes, b"%PDF");
+    }
+
+    #[test]
+    fn corpo_json_do_android_vira_bytes() {
+        let corpo = InvokeBody::Json(serde_json::json!([37, 80, 68, 70, 0, 255]));
+        assert_eq!(&*bytes_from_body(&corpo).unwrap(), &[37, 80, 68, 70, 0, 255]);
+    }
+
+    #[test]
+    fn valor_que_nao_e_byte_recusa_o_corpo_inteiro() {
+        for invalido in [serde_json::json!([37, 256]), serde_json::json!([37, -1]), serde_json::json!([37, "x"])] {
+            assert!(matches!(bytes_from_body(&InvokeBody::Json(invalido)), Err(Error::SemBytes)));
+        }
+        assert!(matches!(bytes_from_body(&InvokeBody::Json(serde_json::json!({}))), Err(Error::SemBytes)));
+    }
+
+    #[cfg(not(target_os = "android"))]
+    mod disco {
+        use super::super::disk;
+        use std::fs;
+        use std::path::PathBuf;
+
+        fn pasta(nome: &str) -> PathBuf {
+            let pasta = std::env::temp_dir().join(format!("saf-save-teste-{nome}-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&pasta);
+            fs::create_dir_all(&pasta).unwrap();
+            pasta
+        }
+
+        #[test]
+        fn grava_os_bytes_inteiros() {
+            let pasta = pasta("grava");
+            let destino = pasta.join("saida.pdf");
+            disk::write(&destino, b"%PDF-1.7 ... %%EOF").unwrap();
+            assert_eq!(fs::read(&destino).unwrap(), b"%PDF-1.7 ... %%EOF");
+            fs::remove_dir_all(pasta).unwrap();
+        }
+
+        #[test]
+        fn copia_identica_para_outro_destino() {
+            let pasta = pasta("copia");
+            let origem = pasta.join("a.pdf");
+            let destino = pasta.join("b.pdf");
+            fs::write(&origem, b"conteudo").unwrap();
+            disk::copy(&origem, &destino).unwrap();
+            assert_eq!(fs::read(&destino).unwrap(), b"conteudo");
+            assert_eq!(fs::read(&origem).unwrap(), b"conteudo");
+            fs::remove_dir_all(pasta).unwrap();
+        }
+
+        #[test]
+        fn copiar_sobre_si_mesmo_nao_zera_a_origem() {
+            let pasta = pasta("mesmo");
+            let origem = pasta.join("a.pdf");
+            fs::write(&origem, b"conteudo").unwrap();
+            // Outro caminho para o mesmo arquivo: so a comparacao canonica percebe.
+            let outro_caminho = pasta.join(".").join("a.pdf");
+            disk::copy(&origem, &outro_caminho).unwrap();
+            assert_eq!(fs::read(&origem).unwrap(), b"conteudo");
+            fs::remove_dir_all(pasta).unwrap();
+        }
+
+        #[test]
+        fn origem_que_sumiu_e_erro() {
+            let pasta = pasta("sumiu");
+            let resultado = disk::copy(&pasta.join("nao-existe.pdf"), &pasta.join("b.pdf"));
+            assert!(resultado.is_err());
+            fs::remove_dir_all(pasta).unwrap();
+        }
+    }
 }

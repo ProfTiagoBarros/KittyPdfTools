@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rastreabilidade PDFKitty</title>
+<style>
+:root {
+  --fundo: #f6f7f9; --superficie: #ffffff; --borda: #e3e6eb; --texto: #1d2330; --mudo: #667085;
+  --acento: #4f46e5; --acento-suave: #eef0ff; --direto: #4f46e5; --indireto: #c7cbff;
+  --alerta: #b54708; --alerta-suave: #fff6ed; --ok: #067647; --ok-suave: #ecfdf3;
+  --u: #0e7090; --e: #6941c6; --n: #b54708; --sombra: 0 1px 2px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fundo: #0f1218; --superficie: #171b24; --borda: #2a303c; --texto: #e7eaf0; --mudo: #98a2b3;
+    --acento: #8b93ff; --acento-suave: #232845; --direto: #8b93ff; --indireto: #3a3f6b;
+    --alerta: #fdb022; --alerta-suave: #2b2112; --ok: #47cd89; --ok-suave: #102a1e; --sombra: none;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundo); color: var(--texto);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.01em; }
+h2 { font-size: 19px; margin: 40px 0 6px; }
+h3 { font-size: 16px; margin: 0; }
+p { margin: 6px 0; }
+code { font: 12.5px ui-monospace, "Cascadia Code", Consolas, monospace; }
+a { color: var(--acento); text-decoration: none; }
+.sub { color: var(--mudo); margin: 0 0 20px; }
+.nota { color: var(--mudo); font-size: 13.5px; margin-bottom: 12px; }
+.numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.numero { background: var(--superficie); border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; box-shadow: var(--sombra); }
+.numero b { display: block; font-size: 26px; line-height: 1.1; }
+.numero span { color: var(--mudo); font-size: 13px; }
+.uso { background: var(--acento-suave); border-radius: 12px; padding: 14px 18px; margin-top: 16px; }
+.uso pre { margin: 8px 0 0; white-space: pre-wrap; }
+.rolagem { overflow-x: auto; background: var(--superficie); border: 1px solid var(--borda); border-radius: 12px; box-shadow: var(--sombra); }
+table { border-collapse: collapse; width: 100%; }
+.mapa th, .mapa td { border-bottom: 1px solid var(--borda); }
+.mapa thead th { font-size: 12px; font-weight: 600; color: var(--mudo); padding: 10px 4px; writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; height: 170px; vertical-align: bottom; }
+.mapa thead th.canto { writing-mode: horizontal-tb; transform: none; text-align: left; vertical-align: bottom; padding: 10px 14px; }
+.mapa tbody th { text-align: left; padding: 8px 14px; font-weight: 500; white-space: nowrap; }
+.mapa tbody th a { font: 600 12.5px ui-monospace, Consolas, monospace; }
+.mapa tbody th span { display: block; color: var(--mudo); font-size: 12px; font-weight: 400; }
+.mapa td { width: 38px; min-width: 38px; height: 38px; text-align: center; }
+.mapa td.direto::after, .mapa td.indireto::after { content: ""; display: inline-block; width: 16px; height: 16px; border-radius: 50%; vertical-align: middle; }
+.mapa td.direto::after { background: var(--direto); }
+.mapa td.indireto::after { background: var(--indireto); }
+.mapa td.afeta { width: auto; padding: 0 14px; color: var(--mudo); white-space: nowrap; }
+.mapa td.afeta b { color: var(--texto); }
+.mapa tr.foco th, .mapa tr.foco td { background: var(--acento-suave); }
+.mapa td.foco-col { background: var(--acento-suave); }
+.legenda { display: flex; gap: 18px; color: var(--mudo); font-size: 13px; margin: 10px 2px 0; flex-wrap: wrap; }
+.legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.req th { text-align: left; padding: 10px 14px; font-weight: 500; white-space: nowrap; }
+.req th code { margin-right: 8px; color: var(--acento); }
+.req td { padding: 10px 14px; border-top: 1px solid var(--borda); vertical-align: top; }
+.req th { border-top: 1px solid var(--borda); vertical-align: top; }
+.req tr:first-child th, .req tr:first-child td { border-top: 0; }
+.restricao { color: var(--mudo); font-size: 13.5px; }
+.chip { display: inline-block; font: 600 11.5px ui-monospace, Consolas, monospace; padding: 2px 8px; border-radius: 999px; margin: 2px 4px 2px 0; border: 1px solid var(--borda); background: var(--fundo); color: var(--texto); }
+.chip.func { border-color: transparent; background: var(--acento-suave); color: var(--acento); }
+.chip.req { border-color: transparent; background: var(--ok-suave); color: var(--ok); }
+.busca { width: 100%; max-width: 420px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--borda); background: var(--superficie); color: var(--texto); font: inherit; margin: 6px 0 14px; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 14px; }
+.cartao { background: var(--superficie); border: 1px solid var(--borda); border-radius: 12px; padding: 16px; box-shadow: var(--sombra); scroll-margin-top: 16px; }
+.cartao:target { outline: 2px solid var(--acento); }
+.cartao header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.cartao .id { color: var(--acento); font-weight: 600; }
+.cartao .rota { margin-left: auto; color: var(--mudo); }
+.linha { margin-top: 8px; }
+.rotulo { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--mudo); margin-bottom: 3px; }
+.alerta .rotulo { color: var(--alerta); }
+.bloco { margin-top: 10px; }
+.manual { background: var(--alerta-suave); border-radius: 8px; padding: 8px 10px; }
+.manual ul { margin: 0; padding-left: 18px; font-size: 13.5px; }
+details { margin-top: 10px; font-size: 13.5px; }
+summary { cursor: pointer; color: var(--mudo); }
+ul.arquivos, ul.testes { list-style: none; padding: 0; margin: 6px 0 0; }
+ul.arquivos li, ul.testes li { padding: 2px 0; overflow-wrap: anywhere; }
+.tag { display: inline-block; width: 38px; font: 600 10.5px system-ui, sans-serif; text-transform: uppercase; color: #fff; border-radius: 4px; text-align: center; margin-right: 8px; padding: 1px 0; }
+.tag.u { background: var(--u); } .tag.e { background: var(--e); } .tag.n { background: var(--n); }
+.mudo { color: var(--mudo); font-size: 13.5px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Matriz de rastreabilidade</h1>
+  <p class="sub">PDFKitty · requisito &rarr; funcionalidade &rarr; codigo &rarr; testes. Gerada de <code>packages/rastreabilidade/src/matriz.ts</code>; nao edite a mao.</p>
+
+  <section class="numeros">
+    <div class="numero"><b>13</b><span>requisitos</span></div>
+    <div class="numero"><b>9</b><span>funcionalidades</span></div>
+    <div class="numero"><b>16</b><span>componentes</span></div>
+    <div class="numero"><b>25</b><span>testes unitarios</span></div>
+    <div class="numero"><b>12</b><span>specs E2E</span></div>
+    <div class="numero"><b>1</b><span>suites nativas</span></div>
+  </section>
+
+  <div class="uso">
+    <b>Antes de mexer:</b> encontre o componente no mapa e veja quantas funcionalidades ele afeta.
+    <b>Depois de mexer:</b>
+<pre><code>pnpm test:impact            # testes de tudo o que a mudanca pode quebrar
+pnpm test:impact --listar   # so mostra o que rodaria
+pnpm rastreabilidade        # regenera esta pagina</code></pre>
+    O <code>git push</code> roda <code>pnpm test:impact</code> sozinho e recusa o envio se algum teste impactado falhar.
+  </div>
+
+  <h2>Mapa de impacto</h2>
+  <p class="nota">Linhas sao componentes compartilhados; colunas, funcionalidades. Mexer numa linha exige os testes de todas as colunas marcadas nela. Passe o mouse para destacar.</p>
+  <div class="rolagem">
+    <table class="mapa">
+      <thead><tr><th class="canto">Componente</th><th scope="col" data-f="F-UNIR"><a href="#F-UNIR">Unir e organizar</a></th><th scope="col" data-f="F-EXTRAIR"><a href="#F-EXTRAIR">Extrair</a></th><th scope="col" data-f="F-DIVIDIR"><a href="#F-DIVIDIR">Dividir</a></th><th scope="col" data-f="F-COMPACTAR"><a href="#F-COMPACTAR">Compactar</a></th><th scope="col" data-f="F-OCR"><a href="#F-OCR">Reconhecer texto (OCR)</a></th><th scope="col" data-f="F-ASSINAR"><a href="#F-ASSINAR">Assinar (ICP-Brasil A1)</a></th><th scope="col" data-f="F-OFUSCAR"><a href="#F-OFUSCAR">Ofuscar</a></th><th scope="col" data-f="F-BUSCA"><a href="#F-BUSCA">Busca de campo aberto</a></th><th scope="col" data-f="F-LUPA"><a href="#F-LUPA">Lupa na pagina</a></th><th class="canto">Afeta</th></tr></thead>
+      <tbody><tr data-c="C-NUCLEO"><th scope="row"><a href="#C-NUCLEO">C-NUCLEO</a><span>Nucleo de PDF: erros, API e utilitarios</span></th><td class="indireto" data-f="F-UNIR" title="F-UNIR usa C-NUCLEO por meio de outro componente"></td><td class="indireto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-NUCLEO por meio de outro componente"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-NUCLEO"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-NUCLEO"></td><td class="direto" data-f="F-OCR" title="F-OCR usa C-NUCLEO"></td><td class="indireto" data-f="F-ASSINAR" title="F-ASSINAR usa C-NUCLEO por meio de outro componente"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-NUCLEO"></td><td class="indireto" data-f="F-BUSCA" title="F-BUSCA usa C-NUCLEO por meio de outro componente"></td><td class="indireto" data-f="F-LUPA" title="F-LUPA usa C-NUCLEO por meio de outro componente"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-COMPOSICAO"><th scope="row"><a href="#C-COMPOSICAO">C-COMPOSICAO</a><span>Composicao de paginas (pdf-lib)</span></th><td class="direto" data-f="F-UNIR" title="F-UNIR usa C-COMPOSICAO"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-COMPOSICAO"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-COMPOSICAO"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-COMPOSICAO"></td><td class="indireto" data-f="F-OCR" title="F-OCR usa C-COMPOSICAO por meio de outro componente"></td><td class="indireto" data-f="F-ASSINAR" title="F-ASSINAR usa C-COMPOSICAO por meio de outro componente"></td><td class="indireto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-COMPOSICAO por meio de outro componente"></td><td class="indireto" data-f="F-BUSCA" title="F-BUSCA usa C-COMPOSICAO por meio de outro componente"></td><td class="indireto" data-f="F-LUPA" title="F-LUPA usa C-COMPOSICAO por meio de outro componente"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-VERIFICACAO"><th scope="row"><a href="#C-VERIFICACAO">C-VERIFICACAO</a><span>Verificacao de vazamento</span></th><td class="" data-f="F-UNIR"></td><td class="" data-f="F-EXTRAIR"></td><td class="" data-f="F-DIVIDIR"></td><td class="" data-f="F-COMPACTAR"></td><td class="" data-f="F-OCR"></td><td class="" data-f="F-ASSINAR"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-VERIFICACAO"></td><td class="" data-f="F-BUSCA"></td><td class="" data-f="F-LUPA"></td><td class="afeta"><b>1</b>/9</td></tr><tr data-c="C-MENSAGENS"><th scope="row"><a href="#C-MENSAGENS">C-MENSAGENS</a><span>Envelope de mensagens entre threads</span></th><td class="indireto" data-f="F-UNIR" title="F-UNIR usa C-MENSAGENS por meio de outro componente"></td><td class="indireto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-MENSAGENS por meio de outro componente"></td><td class="indireto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-MENSAGENS por meio de outro componente"></td><td class="indireto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-MENSAGENS por meio de outro componente"></td><td class="indireto" data-f="F-OCR" title="F-OCR usa C-MENSAGENS por meio de outro componente"></td><td class="direto" data-f="F-ASSINAR" title="F-ASSINAR usa C-MENSAGENS"></td><td class="indireto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-MENSAGENS por meio de outro componente"></td><td class="indireto" data-f="F-BUSCA" title="F-BUSCA usa C-MENSAGENS por meio de outro componente"></td><td class="indireto" data-f="F-LUPA" title="F-LUPA usa C-MENSAGENS por meio de outro componente"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-RENDERIZACAO"><th scope="row"><a href="#C-RENDERIZACAO">C-RENDERIZACAO</a><span>Renderizacao (pdf.js)</span></th><td class="indireto" data-f="F-UNIR" title="F-UNIR usa C-RENDERIZACAO por meio de outro componente"></td><td class="indireto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-RENDERIZACAO por meio de outro componente"></td><td class="indireto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-RENDERIZACAO por meio de outro componente"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-RENDERIZACAO"></td><td class="direto" data-f="F-OCR" title="F-OCR usa C-RENDERIZACAO"></td><td class="indireto" data-f="F-ASSINAR" title="F-ASSINAR usa C-RENDERIZACAO por meio de outro componente"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-RENDERIZACAO"></td><td class="direto" data-f="F-BUSCA" title="F-BUSCA usa C-RENDERIZACAO"></td><td class="direto" data-f="F-LUPA" title="F-LUPA usa C-RENDERIZACAO"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-DOCUMENTOS"><th scope="row"><a href="#C-DOCUMENTOS">C-DOCUMENTOS</a><span>Worker de documentos (pdf-lib)</span></th><td class="direto" data-f="F-UNIR" title="F-UNIR usa C-DOCUMENTOS"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-DOCUMENTOS"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-DOCUMENTOS"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-DOCUMENTOS"></td><td class="indireto" data-f="F-OCR" title="F-OCR usa C-DOCUMENTOS por meio de outro componente"></td><td class="indireto" data-f="F-ASSINAR" title="F-ASSINAR usa C-DOCUMENTOS por meio de outro componente"></td><td class="indireto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-DOCUMENTOS por meio de outro componente"></td><td class="indireto" data-f="F-BUSCA" title="F-BUSCA usa C-DOCUMENTOS por meio de outro componente"></td><td class="indireto" data-f="F-LUPA" title="F-LUPA usa C-DOCUMENTOS por meio de outro componente"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-ESTADO"><th scope="row"><a href="#C-ESTADO">C-ESTADO</a><span>Estado da composicao</span></th><td class="direto" data-f="F-UNIR" title="F-UNIR usa C-ESTADO"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-ESTADO"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-ESTADO"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-ESTADO"></td><td class="direto" data-f="F-OCR" title="F-OCR usa C-ESTADO"></td><td class="direto" data-f="F-ASSINAR" title="F-ASSINAR usa C-ESTADO"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-ESTADO"></td><td class="direto" data-f="F-BUSCA" title="F-BUSCA usa C-ESTADO"></td><td class="direto" data-f="F-LUPA" title="F-LUPA usa C-ESTADO"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-I18N"><th scope="row"><a href="#C-I18N">C-I18N</a><span>Internacionalizacao</span></th><td class="direto" data-f="F-UNIR" title="F-UNIR usa C-I18N"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-I18N"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-I18N"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-I18N"></td><td class="direto" data-f="F-OCR" title="F-OCR usa C-I18N"></td><td class="direto" data-f="F-ASSINAR" title="F-ASSINAR usa C-I18N"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-I18N"></td><td class="direto" data-f="F-BUSCA" title="F-BUSCA usa C-I18N"></td><td class="direto" data-f="F-LUPA" title="F-LUPA usa C-I18N"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-GERACAO"><th scope="row"><a href="#C-GERACAO">C-GERACAO</a><span>Fluxo de geracao e gravacao</span></th><td class="direto" data-f="F-UNIR" title="F-UNIR usa C-GERACAO"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-GERACAO"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-GERACAO"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-GERACAO"></td><td class="direto" data-f="F-OCR" title="F-OCR usa C-GERACAO"></td><td class="direto" data-f="F-ASSINAR" title="F-ASSINAR usa C-GERACAO"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-GERACAO"></td><td class="indireto" data-f="F-BUSCA" title="F-BUSCA usa C-GERACAO por meio de outro componente"></td><td class="indireto" data-f="F-LUPA" title="F-LUPA usa C-GERACAO por meio de outro componente"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-SERVICOS"><th scope="row"><a href="#C-SERVICOS">C-SERVICOS</a><span>Workers da sessao e liberacao de memoria</span></th><td class="direto" data-f="F-UNIR" title="F-UNIR usa C-SERVICOS"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-SERVICOS"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-SERVICOS"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-SERVICOS"></td><td class="direto" data-f="F-OCR" title="F-OCR usa C-SERVICOS"></td><td class="direto" data-f="F-ASSINAR" title="F-ASSINAR usa C-SERVICOS"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-SERVICOS"></td><td class="direto" data-f="F-BUSCA" title="F-BUSCA usa C-SERVICOS"></td><td class="direto" data-f="F-LUPA" title="F-LUPA usa C-SERVICOS"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-INTERVALOS"><th scope="row"><a href="#C-INTERVALOS">C-INTERVALOS</a><span>Intervalos de paginas e selecao</span></th><td class="" data-f="F-UNIR"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-INTERVALOS"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-INTERVALOS"></td><td class="" data-f="F-COMPACTAR"></td><td class="" data-f="F-OCR"></td><td class="" data-f="F-ASSINAR"></td><td class="" data-f="F-OFUSCAR"></td><td class="" data-f="F-BUSCA"></td><td class="" data-f="F-LUPA"></td><td class="afeta"><b>2</b>/9</td></tr><tr data-c="C-GRADE"><th scope="row"><a href="#C-GRADE">C-GRADE</a><span>Grade de paginas e miniaturas</span></th><td class="direto" data-f="F-UNIR" title="F-UNIR usa C-GRADE"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-GRADE"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-GRADE"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-GRADE"></td><td class="direto" data-f="F-OCR" title="F-OCR usa C-GRADE"></td><td class="direto" data-f="F-ASSINAR" title="F-ASSINAR usa C-GRADE"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-GRADE"></td><td class="direto" data-f="F-BUSCA" title="F-BUSCA usa C-GRADE"></td><td class="direto" data-f="F-LUPA" title="F-LUPA usa C-GRADE"></td><td class="afeta"><b>9</b>/9</td></tr><tr data-c="C-CASCA"><th scope="row"><a href="#C-CASCA">C-CASCA</a><span>Casca do workspace e navegacao</span></th><td class="direto" data-f="F-UNIR" title="F-UNIR usa C-CASCA"></td><td class="direto" data-f="F-EXTRAIR" title="F-EXTRAIR usa C-CASCA"></td><td class="direto" data-f="F-DIVIDIR" title="F-DIVIDIR usa C-CASCA"></td><td class="direto" data-f="F-COMPACTAR" title="F-COMPACTAR usa C-CASCA"></td><td class="direto" data-f="F-OCR" title="F-OCR usa C-CASCA"></td><td class="direto" data-f="F-ASSINAR" title="F-ASSINAR usa C-CASCA"></td><td class="direto" data-f="F-OFUSCAR" title="F-OFUSCAR usa C-CASCA"></td><td class="" data-f="F-BUSCA"></td><td class="" data-f="F-LUPA"></td><td class="afeta"><b>7</b>/9</td></tr><tr data-c="C-PROTOTIPOS"><th scope="row"><a href="#C-PROTOTIPOS">C-PROTOTIPOS</a><span>Rotas de prototipo (spikes)</span></th><td class="" data-f="F-UNIR"></td><td class="" data-f="F-EXTRAIR"></td><td class="" data-f="F-DIVIDIR"></td><td class="" data-f="F-COMPACTAR"></td><td class="" data-f="F-OCR"></td><td class="" data-f="F-ASSINAR"></td><td class="" data-f="F-OFUSCAR"></td><td class="" data-f="F-BUSCA"></td><td class="" data-f="F-LUPA"></td><td class="afeta"><b>0</b>/9</td></tr><tr data-c="C-PLATAFORMA"><th scope="row"><a href="#C-PLATAFORMA">C-PLATAFORMA</a><span>Empacotamento Tauri (Windows e Android)</span></th><td class="" data-f="F-UNIR"></td><td class="" data-f="F-EXTRAIR"></td><td class="" data-f="F-DIVIDIR"></td><td class="" data-f="F-COMPACTAR"></td><td class="" data-f="F-OCR"></td><td class="" data-f="F-ASSINAR"></td><td class="" data-f="F-OFUSCAR"></td><td class="" data-f="F-BUSCA"></td><td class="" data-f="F-LUPA"></td><td class="afeta"><b>0</b>/9</td></tr><tr data-c="C-RASTREABILIDADE"><th scope="row"><a href="#C-RASTREABILIDADE">C-RASTREABILIDADE</a><span>Matriz de rastreabilidade</span></th><td class="" data-f="F-UNIR"></td><td class="" data-f="F-EXTRAIR"></td><td class="" data-f="F-DIVIDIR"></td><td class="" data-f="F-COMPACTAR"></td><td class="" data-f="F-OCR"></td><td class="" data-f="F-ASSINAR"></td><td class="" data-f="F-OFUSCAR"></td><td class="" data-f="F-BUSCA"></td><td class="" data-f="F-LUPA"></td><td class="afeta"><b>0</b>/9</td></tr></tbody>
+    </table>
+  </div>
+  <div class="legenda"><span><i style="background:var(--direto)"></i>usa diretamente</span><span><i style="background:var(--indireto)"></i>usa por meio de outro componente</span></div>
+
+  <h2>Requisitos</h2>
+  <div class="rolagem"><table class="req"><tbody><tr><th scope="row"><code>US-01</code>Organizacao de paginas</th><td><a class="chip func" href="#F-UNIR">F-UNIR</a><a class="chip comp" href="#C-GRADE">C-GRADE</a></td><td class="restricao">Multi-arquivo; mesclar paginas ENTRE PDFs; reordenar por arraste E por botao.</td></tr><tr><th scope="row"><code>US-02</code>Fusao, divisao e extracao</th><td><a class="chip func" href="#F-UNIR">F-UNIR</a><a class="chip func" href="#F-EXTRAIR">F-EXTRAIR</a><a class="chip func" href="#F-DIVIDIR">F-DIVIDIR</a><a class="chip comp" href="#C-INTERVALOS">C-INTERVALOS</a></td><td class="restricao">Extrair entrega 1 arquivo; dividir entrega varios num pacote; a selecao da grade preenche o campo.</td></tr><tr><th scope="row"><code>US-03</code>Ofuscacao</th><td><a class="chip func" href="#F-OFUSCAR">F-OFUSCAR</a></td><td class="restricao">Remover do content stream, irreversivel. Retangulo preto nao e ofuscacao.</td></tr><tr><th scope="row"><code>US-04</code>OCR local</th><td><a class="chip func" href="#F-OCR">F-OCR</a></td><td class="restricao">Tesseract em worker, PT-BR, barra de progresso obrigatoria.</td></tr><tr><th scope="row"><code>US-05</code>Assinatura ICP-Brasil</th><td><a class="chip func" href="#F-ASSINAR">F-ASSINAR</a></td><td class="restricao">A1 .pfx so em memoria; chave nunca persistida, logada ou transmitida.</td></tr><tr><th scope="row"><code>US-06</code>Busca de campo aberto</th><td><a class="chip func" href="#F-BUSCA">F-BUSCA</a></td><td class="restricao">Destaca (nao filtra) paginas com pelo menos uma ocorrencia, entre PDFs distintos.</td></tr><tr><th scope="row"><code>US-07</code>Compactar</th><td><a class="chip func" href="#F-COMPACTAR">F-COMPACTAR</a></td><td class="restricao">Sem perda ou forte; avisar antes de degradar; alvo de tamanho; avisar quando crescer.</td></tr><tr><th scope="row"><code>US-08</code>Lupa na pagina</th><td><a class="chip func" href="#F-LUPA">F-LUPA</a></td><td class="restricao">Ler nome e matricula sem gerar o PDF; navega e reordena; segue a chave, nao a posicao.</td></tr><tr><th scope="row"><code>RNF-01</code>Zero-Data Transfer</th><td><a class="chip func" href="#F-ASSINAR">F-ASSINAR</a><a class="chip comp" href="#C-CASCA">C-CASCA</a><a class="chip comp" href="#C-PLATAFORMA">C-PLATAFORMA</a></td><td class="restricao">Nenhum byte de documento sai do aparelho. Android sem a permissao INTERNET.</td></tr><tr><th scope="row"><code>RNF-02</code>Processamento em workers</th><td><a class="chip func" href="#F-OCR">F-OCR</a><a class="chip comp" href="#C-MENSAGENS">C-MENSAGENS</a><a class="chip comp" href="#C-RENDERIZACAO">C-RENDERIZACAO</a><a class="chip comp" href="#C-DOCUMENTOS">C-DOCUMENTOS</a></td><td class="restricao">Trabalho pesado fora da main thread, com progresso e buffers transferidos.</td></tr><tr><th scope="row"><code>RNF-03</code>Orcamento de memoria</th><td><a class="chip func" href="#F-UNIR">F-UNIR</a><a class="chip func" href="#F-COMPACTAR">F-COMPACTAR</a><a class="chip comp" href="#C-COMPOSICAO">C-COMPOSICAO</a><a class="chip comp" href="#C-RENDERIZACAO">C-RENDERIZACAO</a><a class="chip comp" href="#C-DOCUMENTOS">C-DOCUMENTOS</a><a class="chip comp" href="#C-GERACAO">C-GERACAO</a><a class="chip comp" href="#C-SERVICOS">C-SERVICOS</a><a class="chip comp" href="#C-GRADE">C-GRADE</a></td><td class="restricao">Caber em ~2 GB por processo (Windows 32 bits): tela e workers dividem o processo.</td></tr><tr><th scope="row"><code>RNF-04</code>Offline-first</th><td><a class="chip func" href="#F-OCR">F-OCR</a><a class="chip comp" href="#C-RENDERIZACAO">C-RENDERIZACAO</a><a class="chip comp" href="#C-PLATAFORMA">C-PLATAFORMA</a></td><td class="restricao">Fontes, workers, wasm e traineddata viajam no pacote.</td></tr><tr><th scope="row"><code>RNF-05</code>Internacionalizacao</th><td><a class="chip comp" href="#C-NUCLEO">C-NUCLEO</a><a class="chip comp" href="#C-I18N">C-I18N</a></td><td class="restricao">Sem texto fixo na interface; dicionarios completos; erros traduzidos por codigo.</td></tr></tbody></table></div>
+
+  <h2>Funcionalidades e componentes</h2>
+  <input class="busca" type="search" placeholder="Filtrar por nome, arquivo ou requisito..." aria-label="Filtrar">
+  <h3 style="margin:8px 0 10px">Funcionalidades</h3>
+  <section class="grade">
+  <article class="cartao" id="F-UNIR" data-busca="f-unir unir e organizar junta paginas de varios pdfs, reordena, gira, duplica, exclui e desfaz. apps/web/src/app/unir/** apps/web/src/components/workspace/organize-tool.tsx us-01 us-02 rnf-03">
+    <header>
+      <code class="id">F-UNIR</code>
+      <h3>Unir e organizar</h3>
+      <code class="rota">/unir/</code>
+    </header>
+    <p>Junta paginas de varios PDFs, reordena, gira, duplica, exclui e desfaz.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-01</span><span class="chip req">US-02</span><span class="chip req">RNF-03</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-CASCA</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-GERACAO</span><span class="chip comp">C-I18N</span><span class="chip comp">C-DOCUMENTOS</span><span class="chip comp">C-COMPOSICAO</span></div>
+    
+    <details><summary>Arquivos (2)</summary><ul class="arquivos"><li><code>apps/web/src/app/unir/**</code></li><li><code>apps/web/src/components/workspace/organize-tool.tsx</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; CARREGAR, SELETOR, ARQUIVO</li><li>verify:android -&gt; UNIR SELETOR/ARQUIVO/INTEGRO, REABRIR</li></ul></div>
+  </article>
+  <article class="cartao" id="F-EXTRAIR" data-busca="f-extrair extrair recorta as paginas escolhidas para um arquivo pdf. apps/web/src/app/extrair/** apps/web/src/components/workspace/extract-tool.tsx us-02">
+    <header>
+      <code class="id">F-EXTRAIR</code>
+      <h3>Extrair</h3>
+      <code class="rota">/extrair/</code>
+    </header>
+    <p>Recorta as paginas escolhidas para UM arquivo PDF.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-02</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-CASCA</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-GERACAO</span><span class="chip comp">C-I18N</span><span class="chip comp">C-INTERVALOS</span><span class="chip comp">C-DOCUMENTOS</span><span class="chip comp">C-COMPOSICAO</span></div>
+    
+    <details><summary>Arquivos (2)</summary><ul class="arquivos"><li><code>apps/web/src/app/extrair/**</code></li><li><code>apps/web/src/components/workspace/extract-tool.tsx</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag e">e2e</span><code>extract.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; EXTRAIR</li><li>verify:android -&gt; LIGACAO, EXTRAIR CONTEUDO</li></ul></div>
+  </article>
+  <article class="cartao" id="F-DIVIDIR" data-busca="f-dividir dividir quebra o documento em varios arquivos, por faixa ou por tamanho, num pacote .zip. apps/web/src/app/dividir/** apps/web/src/components/workspace/split-tool.tsx packages/pdf-core/src/split/{split.ts,archive.ts,index.ts} us-02">
+    <header>
+      <code class="id">F-DIVIDIR</code>
+      <h3>Dividir</h3>
+      <code class="rota">/dividir/</code>
+    </header>
+    <p>Quebra o documento em varios arquivos, por faixa ou por tamanho, num pacote .zip.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-02</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-CASCA</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-GERACAO</span><span class="chip comp">C-I18N</span><span class="chip comp">C-INTERVALOS</span><span class="chip comp">C-DOCUMENTOS</span><span class="chip comp">C-COMPOSICAO</span><span class="chip comp">C-NUCLEO</span></div>
+    
+    <details><summary>Arquivos (3)</summary><ul class="arquivos"><li><code>apps/web/src/app/dividir/**</code></li><li><code>apps/web/src/components/workspace/split-tool.tsx</code></li><li><code>packages/pdf-core/src/split/{split.ts,archive.ts,index.ts}</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>split.test.ts</code></li><li><span class="tag u">unit</span><code>archive.test.ts</code></li><li><span class="tag e">e2e</span><code>split.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; DIVIDIR</li><li>verify:android -&gt; DIVIDIR CONTEUDO</li></ul></div>
+  </article>
+  <article class="cartao" id="F-COMPACTAR" data-busca="f-compactar compactar sem perda (reempacota e tira a camada de ocr) ou forte (rasteriza em jpeg), com alvo de tamanho. apps/web/src/app/compactar/** apps/web/src/components/workspace/compress-tool.tsx packages/pdf-core/src/compression/** us-07 rnf-03">
+    <header>
+      <code class="id">F-COMPACTAR</code>
+      <h3>Compactar</h3>
+      <code class="rota">/compactar/</code>
+    </header>
+    <p>Sem perda (reempacota e tira a camada de OCR) ou forte (rasteriza em JPEG), com alvo de tamanho.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-07</span><span class="chip req">RNF-03</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-CASCA</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-GERACAO</span><span class="chip comp">C-I18N</span><span class="chip comp">C-DOCUMENTOS</span><span class="chip comp">C-COMPOSICAO</span><span class="chip comp">C-RENDERIZACAO</span><span class="chip comp">C-NUCLEO</span></div>
+    
+    <details><summary>Arquivos (3)</summary><ul class="arquivos"><li><code>apps/web/src/app/compactar/**</code></li><li><code>apps/web/src/components/workspace/compress-tool.tsx</code></li><li><code>packages/pdf-core/src/compression/**</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>invisible-text.test.ts</code></li><li><span class="tag u">unit</span><code>repack.test.ts</code></li><li><span class="tag u">unit</span><code>rasterize-compression.test.ts</code></li><li><span class="tag e">e2e</span><code>compress.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; COMPACTAR</li><li>verify:android -&gt; SEM PERDA, FORTE AVISO, FORTE x S/PERDA</li></ul></div>
+  </article>
+  <article class="cartao" id="F-OCR" data-busca="f-ocr reconhecer texto (ocr) tesseract local em portugues; grava uma camada de texto invisivel e pesquisavel. apps/web/src/app/ocr/** apps/web/src/components/workspace/ocr-tool.tsx apps/web/src/workers/ocr.ts packages/pdf-core/src/ocr/** apps/web/scripts/sync-tesseract.mjs apps/web/por.traineddata us-04 rnf-02 rnf-04">
+    <header>
+      <code class="id">F-OCR</code>
+      <h3>Reconhecer texto (OCR)</h3>
+      <code class="rota">/ocr/</code>
+    </header>
+    <p>Tesseract local em portugues; grava uma camada de texto invisivel e pesquisavel.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-04</span><span class="chip req">RNF-02</span><span class="chip req">RNF-04</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-CASCA</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-GERACAO</span><span class="chip comp">C-I18N</span><span class="chip comp">C-RENDERIZACAO</span><span class="chip comp">C-NUCLEO</span></div>
+    
+    <details><summary>Arquivos (6)</summary><ul class="arquivos"><li><code>apps/web/src/app/ocr/**</code></li><li><code>apps/web/src/components/workspace/ocr-tool.tsx</code></li><li><code>apps/web/src/workers/ocr.ts</code></li><li><code>packages/pdf-core/src/ocr/**</code></li><li><code>apps/web/scripts/sync-tesseract.mjs</code></li><li><code>apps/web/por.traineddata</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>text-layer.test.ts</code></li><li><span class="tag e">e2e</span><code>ocr.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>OCR num documento escaneado real, no aparelho, com a barra de progresso</li></ul></div>
+  </article>
+  <article class="cartao" id="F-ASSINAR" data-busca="f-assinar assinar (icp-brasil a1) assina com certificado a1; chave e senha vivem so num worker descartavel. apps/web/src/app/assinar/** apps/web/src/components/workspace/sign-tool.tsx apps/web/src/workers/{sign-client.ts,sign-protocol.ts,sign.worker.ts} apps/web/src/i18n/sign-errors.ts us-05 rnf-01">
+    <header>
+      <code class="id">F-ASSINAR</code>
+      <h3>Assinar (ICP-Brasil A1)</h3>
+      <code class="rota">/assinar/</code>
+    </header>
+    <p>Assina com certificado A1; chave e senha vivem so num worker descartavel.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-05</span><span class="chip req">RNF-01</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-CASCA</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-GERACAO</span><span class="chip comp">C-I18N</span><span class="chip comp">C-MENSAGENS</span></div>
+    
+    <details><summary>Arquivos (4)</summary><ul class="arquivos"><li><code>apps/web/src/app/assinar/**</code></li><li><code>apps/web/src/components/workspace/sign-tool.tsx</code></li><li><code>apps/web/src/workers/{sign-client.ts,sign-protocol.ts,sign.worker.ts}</code></li><li><code>apps/web/src/i18n/sign-errors.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>sign-errors.test.ts</code></li><li><span class="tag e">e2e</span><code>sign.spec.ts</code></li><li><span class="tag e">e2e</span><code>sign-spike.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>Assinar com um A1 real e conferir no validador do ITI</li></ul></div>
+  </article>
+  <article class="cartao" id="F-OFUSCAR" data-busca="f-ofuscar ofuscar marca regioes e as destroi no nivel do pixel; o texto nao e mais extraivel. apps/web/src/app/ofuscar/** apps/web/src/components/workspace/redact-tool.tsx apps/web/src/components/workspace/page-viewer.tsx packages/pdf-core/src/redaction/** us-03">
+    <header>
+      <code class="id">F-OFUSCAR</code>
+      <h3>Ofuscar</h3>
+      <code class="rota">/ofuscar/</code>
+    </header>
+    <p>Marca regioes e as destroi no nivel do pixel; o texto nao e mais extraivel.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-03</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-CASCA</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-GERACAO</span><span class="chip comp">C-I18N</span><span class="chip comp">C-RENDERIZACAO</span><span class="chip comp">C-VERIFICACAO</span><span class="chip comp">C-NUCLEO</span></div>
+    
+    <details><summary>Arquivos (4)</summary><ul class="arquivos"><li><code>apps/web/src/app/ofuscar/**</code></li><li><code>apps/web/src/components/workspace/redact-tool.tsx</code></li><li><code>apps/web/src/components/workspace/page-viewer.tsx</code></li><li><code>packages/pdf-core/src/redaction/**</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>rasterize-redaction.test.ts</code></li><li><span class="tag e">e2e</span><code>redact.spec.ts</code></li><li><span class="tag e">e2e</span><code>redaction-worker.spec.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="F-BUSCA" data-busca="f-busca busca de campo aberto destaca em amarelo as paginas com o termo, sem acento e sem caixa, entre pdfs. apps/web/src/components/workspace/search-field.tsx apps/web/src/workspace/search.ts us-06">
+    <header>
+      <code class="id">F-BUSCA</code>
+      <h3>Busca de campo aberto</h3>
+      
+    </header>
+    <p>Destaca em amarelo as paginas com o termo, sem acento e sem caixa, entre PDFs.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-06</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-RENDERIZACAO</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-I18N</span></div>
+    
+    <details><summary>Arquivos (2)</summary><ul class="arquivos"><li><code>apps/web/src/components/workspace/search-field.tsx</code></li><li><code>apps/web/src/workspace/search.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>search.test.ts</code></li><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="F-LUPA" data-busca="f-lupa lupa na pagina abre a pagina a 1400 px, navega com setas e move/gira de dentro. apps/web/src/components/workspace/page-preview.tsx us-08">
+    <header>
+      <code class="id">F-LUPA</code>
+      <h3>Lupa na pagina</h3>
+      
+    </header>
+    <p>Abre a pagina a 1400 px, navega com setas e move/gira de dentro.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-08</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-RENDERIZACAO</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-I18N</span></div>
+    
+    <details><summary>Arquivos (1)</summary><ul class="arquivos"><li><code>apps/web/src/components/workspace/page-preview.tsx</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag e">e2e</span><code>preview.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; LUPA</li><li>verify:android -&gt; LUPA ALVO, LUPA PAG, LUPA ACAO, LUPA AREA</li></ul></div>
+  </article></section>
+  <h3 style="margin:28px 0 10px">Componentes</h3>
+  <section class="grade">
+  <article class="cartao" id="C-NUCLEO" data-busca="c-nucleo nucleo de pdf: erros, api e utilitarios taxonomia de erros por codigo, a api publica do pdf-core, geometria, cessao do laco de eventos e fixtures. packages/pdf-core/src/errors.ts packages/pdf-core/src/index.ts packages/pdf-core/src/geometry.ts packages/pdf-core/src/async.ts packages/pdf-core/src/fixtures.ts rnf-05">
+    <header>
+      <code class="id">C-NUCLEO</code>
+      <h3>Nucleo de PDF: erros, API e utilitarios</h3>
+      
+    </header>
+    <p>Taxonomia de erros por codigo, a API publica do pdf-core, geometria, cessao do laco de eventos e fixtures.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-05</span></div>
+    
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (5)</summary><ul class="arquivos"><li><code>packages/pdf-core/src/errors.ts</code></li><li><code>packages/pdf-core/src/index.ts</code></li><li><code>packages/pdf-core/src/geometry.ts</code></li><li><code>packages/pdf-core/src/async.ts</code></li><li><code>packages/pdf-core/src/fixtures.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>core-errors.test.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-COMPOSICAO" data-busca="c-composicao composicao de paginas (pdf-lib) materializa a lista de paginas num pdf, carregando uma origem por vez. packages/pdf-core/src/composition/** rnf-03">
+    <header>
+      <code class="id">C-COMPOSICAO</code>
+      <h3>Composicao de paginas (pdf-lib)</h3>
+      
+    </header>
+    <p>Materializa a lista de paginas num PDF, carregando uma origem por vez.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-03</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-NUCLEO</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (1)</summary><ul class="arquivos"><li><code>packages/pdf-core/src/composition/**</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>build.test.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-VERIFICACAO" data-busca="c-verificacao verificacao de vazamento extrai texto e procura bytes num pdf: e como se prova que uma ofuscacao e real. packages/pdf-core/src/verification/** packages/pdf-core/src/browser/verification.ts">
+    <header>
+      <code class="id">C-VERIFICACAO</code>
+      <h3>Verificacao de vazamento</h3>
+      
+    </header>
+    <p>Extrai texto e procura bytes num PDF: e como se prova que uma ofuscacao e real.</p>
+    
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-NUCLEO</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-OFUSCAR</span></div>
+    <details><summary>Arquivos (2)</summary><ul class="arquivos"><li><code>packages/pdf-core/src/verification/**</code></li><li><code>packages/pdf-core/src/browser/verification.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag e">e2e</span><code>redaction-worker.spec.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-MENSAGENS" data-busca="c-mensagens envelope de mensagens entre threads formato comum das mensagens dos workers, transporte de erros por codigo e de buffers. apps/web/src/workers/messages.ts rnf-02">
+    <header>
+      <code class="id">C-MENSAGENS</code>
+      <h3>Envelope de mensagens entre threads</h3>
+      
+    </header>
+    <p>Formato comum das mensagens dos workers, transporte de erros por codigo e de buffers.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-02</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-NUCLEO</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (1)</summary><ul class="arquivos"><li><code>apps/web/src/workers/messages.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>messages.test.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-RENDERIZACAO" data-busca="c-renderizacao renderizacao (pdf.js) worker que desenha paginas, extrai texto, rasteriza e orquestra ofuscar, ocr e compactar; cliente com cache lru e liberacao de memoria. apps/web/src/workers/render-client.ts apps/web/src/workers/render-protocol.ts apps/web/src/workers/render.worker.ts packages/pdf-core/src/browser/index.ts packages/pdf-core/src/browser/pdfjs-setup.ts packages/pdf-core/src/browser/renderer.ts packages/pdf-core/scripts/copy-pdfjs-assets.mjs rnf-02 rnf-03 rnf-04">
+    <header>
+      <code class="id">C-RENDERIZACAO</code>
+      <h3>Renderizacao (pdf.js)</h3>
+      
+    </header>
+    <p>Worker que desenha paginas, extrai texto, rasteriza e orquestra ofuscar, OCR e compactar; cliente com cache LRU e liberacao de memoria.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-02</span><span class="chip req">RNF-03</span><span class="chip req">RNF-04</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-MENSAGENS</span><span class="chip comp">C-NUCLEO</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (7)</summary><ul class="arquivos"><li><code>apps/web/src/workers/render-client.ts</code></li><li><code>apps/web/src/workers/render-protocol.ts</code></li><li><code>apps/web/src/workers/render.worker.ts</code></li><li><code>packages/pdf-core/src/browser/index.ts</code></li><li><code>packages/pdf-core/src/browser/pdfjs-setup.ts</code></li><li><code>packages/pdf-core/src/browser/renderer.ts</code></li><li><code>packages/pdf-core/scripts/copy-pdfjs-assets.mjs</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li><li><span class="tag e">e2e</span><code>preview.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; CARREGAR, LUPA</li><li>verify:android -&gt; CARREGAR, LUPA</li></ul></div>
+  </article>
+  <article class="cartao" id="C-DOCUMENTOS" data-busca="c-documentos worker de documentos (pdf-lib) dono dos bytes de cada arquivo aberto: compoe, extrai e divide. apps/web/src/workers/documents-client.ts apps/web/src/workers/documents-protocol.ts apps/web/src/workers/documents.worker.ts rnf-02 rnf-03">
+    <header>
+      <code class="id">C-DOCUMENTOS</code>
+      <h3>Worker de documentos (pdf-lib)</h3>
+      
+    </header>
+    <p>Dono dos bytes de cada arquivo aberto: compoe, extrai e divide.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-02</span><span class="chip req">RNF-03</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-MENSAGENS</span><span class="chip comp">C-COMPOSICAO</span><span class="chip comp">C-NUCLEO</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (3)</summary><ul class="arquivos"><li><code>apps/web/src/workers/documents-client.ts</code></li><li><code>apps/web/src/workers/documents-protocol.ts</code></li><li><code>apps/web/src/workers/documents.worker.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag e">e2e</span><code>documents-worker.spec.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-ESTADO" data-busca="c-estado estado da composicao modelo puro da grade e store zustand: paginas, selecao, historico de desfazer. apps/web/src/workspace/model.ts apps/web/src/workspace/store.ts">
+    <header>
+      <code class="id">C-ESTADO</code>
+      <h3>Estado da composicao</h3>
+      
+    </header>
+    <p>Modelo puro da grade e store Zustand: paginas, selecao, historico de desfazer.</p>
+    
+    
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (2)</summary><ul class="arquivos"><li><code>apps/web/src/workspace/model.ts</code></li><li><code>apps/web/src/workspace/store.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>store.test.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-I18N" data-busca="c-i18n internacionalizacao dicionarios, deteccao de idioma e traducao de erros do nucleo. apps/web/src/i18n/core-errors.ts apps/web/src/i18n/index.ts apps/web/src/i18n/locale-hydrator.tsx apps/web/src/i18n/messages/** apps/web/src/i18n/registry.ts apps/web/src/i18n/store.ts apps/web/src/i18n/use-translation.ts rnf-05">
+    <header>
+      <code class="id">C-I18N</code>
+      <h3>Internacionalizacao</h3>
+      
+    </header>
+    <p>Dicionarios, deteccao de idioma e traducao de erros do nucleo.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-05</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-NUCLEO</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (7)</summary><ul class="arquivos"><li><code>apps/web/src/i18n/core-errors.ts</code></li><li><code>apps/web/src/i18n/index.ts</code></li><li><code>apps/web/src/i18n/locale-hydrator.tsx</code></li><li><code>apps/web/src/i18n/messages/**</code></li><li><code>apps/web/src/i18n/registry.ts</code></li><li><code>apps/web/src/i18n/store.ts</code></li><li><code>apps/web/src/i18n/use-translation.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>core-errors.test.ts</code></li><li><span class="tag u">unit</span><code>registry.test.ts</code></li><li><span class="tag u">unit</span><code>use-translation.test.tsx</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-GERACAO" data-busca="c-geracao fluxo de geracao e gravacao destino antes de gerar, progresso, ultima geracao, gravacao pelo plugin proprio (rust + kotlin) e copia do arquivo ja salvo. apps/web/src/lib/generation.ts apps/web/src/lib/save-pdf.ts apps/web/src/components/workspace/generation-action.tsx apps/desktop/plugins/saf-save/src/** apps/desktop/plugins/saf-save/android/src/** apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro} apps/desktop/plugins/saf-save/{cargo.toml,build.rs} apps/desktop/plugins/saf-save/permissions/default.toml rnf-03">
+    <header>
+      <code class="id">C-GERACAO</code>
+      <h3>Fluxo de geracao e gravacao</h3>
+      
+    </header>
+    <p>Destino antes de gerar, progresso, ultima geracao, gravacao pelo plugin proprio (Rust + Kotlin) e copia do arquivo ja salvo.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-03</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-I18N</span><span class="chip comp">C-NUCLEO</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (8)</summary><ul class="arquivos"><li><code>apps/web/src/lib/generation.ts</code></li><li><code>apps/web/src/lib/save-pdf.ts</code></li><li><code>apps/web/src/components/workspace/generation-action.tsx</code></li><li><code>apps/desktop/plugins/saf-save/src/**</code></li><li><code>apps/desktop/plugins/saf-save/android/src/**</code></li><li><code>apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro}</code></li><li><code>apps/desktop/plugins/saf-save/{Cargo.toml,build.rs}</code></li><li><code>apps/desktop/plugins/saf-save/permissions/default.toml</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>save-pdf.test.ts</code></li><li><span class="tag u">unit</span><code>generation.test.tsx</code></li><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li><li><span class="tag n">rust</span><code>apps/desktop/plugins/saf-save/Cargo.toml</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; ARQUIVO (seletor Salvar como)</li><li>verify:android -&gt; UNIR SELETOR/ARQUIVO/INTEGRO (gravacao pelo SAF)</li></ul></div>
+  </article>
+  <article class="cartao" id="C-SERVICOS" data-busca="c-servicos workers da sessao e liberacao de memoria cria os workers uma vez por sessao e solta as paginas da renderizacao durante operacoes pesadas. apps/web/src/workspace/services.tsx rnf-03">
+    <header>
+      <code class="id">C-SERVICOS</code>
+      <h3>Workers da sessao e liberacao de memoria</h3>
+      
+    </header>
+    <p>Cria os workers uma vez por sessao e solta as paginas da renderizacao durante operacoes pesadas.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-03</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-RENDERIZACAO</span><span class="chip comp">C-DOCUMENTOS</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-GERACAO</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (1)</summary><ul class="arquivos"><li><code>apps/web/src/workspace/services.tsx</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li><li><span class="tag e">e2e</span><code>preview.spec.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-INTERVALOS" data-busca="c-intervalos intervalos de paginas e selecao gramatica `1-3, 7-8` (base 1 na entrada, base 0 na saida) e o vinculo de mao dupla entre campo e grade. packages/pdf-core/src/split/page-ranges.ts apps/web/src/workspace/page-spec.ts apps/web/src/components/workspace/page-range-field.tsx us-02">
+    <header>
+      <code class="id">C-INTERVALOS</code>
+      <h3>Intervalos de paginas e selecao</h3>
+      
+    </header>
+    <p>Gramatica `1-3, 7-8` (base 1 na entrada, base 0 na saida) e o vinculo de mao dupla entre campo e grade.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-02</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-NUCLEO</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-I18N</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span></div>
+    <details><summary>Arquivos (3)</summary><ul class="arquivos"><li><code>packages/pdf-core/src/split/page-ranges.ts</code></li><li><code>apps/web/src/workspace/page-spec.ts</code></li><li><code>apps/web/src/components/workspace/page-range-field.tsx</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>page-ranges.test.ts</code></li><li><span class="tag u">unit</span><code>page-spec.test.ts</code></li><li><span class="tag e">e2e</span><code>extract.spec.ts</code></li><li><span class="tag e">e2e</span><code>split.spec.ts</code></li></ul></div>
+    
+  </article>
+  <article class="cartao" id="C-GRADE" data-busca="c-grade grade de paginas e miniaturas cartoes reordenaveis, miniaturas sob demanda e nunca vazias, desenho com rotacao compartilhado com a lupa. apps/web/src/components/workspace/page-grid.tsx apps/web/src/components/workspace/page-card.tsx apps/web/src/components/workspace/page-thumbnail.tsx apps/web/src/lib/draw-page.ts us-01 rnf-03">
+    <header>
+      <code class="id">C-GRADE</code>
+      <h3>Grade de paginas e miniaturas</h3>
+      
+    </header>
+    <p>Cartoes reordenaveis, miniaturas sob demanda e nunca vazias, desenho com rotacao compartilhado com a lupa.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">US-01</span><span class="chip req">RNF-03</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-I18N</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
+    <details><summary>Arquivos (4)</summary><ul class="arquivos"><li><code>apps/web/src/components/workspace/page-grid.tsx</code></li><li><code>apps/web/src/components/workspace/page-card.tsx</code></li><li><code>apps/web/src/components/workspace/page-thumbnail.tsx</code></li><li><code>apps/web/src/lib/draw-page.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>page-thumbnail.test.tsx</code></li><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:android -&gt; LUPA ALVO (alvo de toque de 44 px)</li></ul></div>
+  </article>
+  <article class="cartao" id="C-CASCA" data-busca="c-casca casca do workspace e navegacao layout, pagina inicial, barra lateral, area de arquivos, barra inferior com area segura, registro de ferramentas. apps/web/src/app/layout.tsx apps/web/src/app/page.tsx apps/web/src/app/globals.css apps/web/src/components/workspace/workspace-shell.tsx apps/web/src/components/workspace/tool-sidebar.tsx apps/web/src/components/workspace/bottom-bar.tsx apps/web/src/components/workspace/dropzone.tsx apps/web/src/components/workspace/properties-panel.tsx apps/web/src/components/ui/** apps/web/src/tools/registry.ts apps/web/src/lib/capabilities.ts apps/web/src/lib/cn.ts rnf-01">
+    <header>
+      <code class="id">C-CASCA</code>
+      <h3>Casca do workspace e navegacao</h3>
+      
+    </header>
+    <p>Layout, pagina inicial, barra lateral, area de arquivos, barra inferior com area segura, registro de ferramentas.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-01</span></div>
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-GRADE</span><span class="chip comp">C-SERVICOS</span><span class="chip comp">C-ESTADO</span><span class="chip comp">C-I18N</span></div>
+    <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-EXTRAIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span></div>
+    <details><summary>Arquivos (12)</summary><ul class="arquivos"><li><code>apps/web/src/app/layout.tsx</code></li><li><code>apps/web/src/app/page.tsx</code></li><li><code>apps/web/src/app/globals.css</code></li><li><code>apps/web/src/components/workspace/workspace-shell.tsx</code></li><li><code>apps/web/src/components/workspace/tool-sidebar.tsx</code></li><li><code>apps/web/src/components/workspace/bottom-bar.tsx</code></li><li><code>apps/web/src/components/workspace/dropzone.tsx</code></li><li><code>apps/web/src/components/workspace/properties-panel.tsx</code></li><li><code>apps/web/src/components/ui/**</code></li><li><code>apps/web/src/tools/registry.ts</code></li><li><code>apps/web/src/lib/capabilities.ts</code></li><li><code>apps/web/src/lib/cn.ts</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>registry.test.ts</code></li><li><span class="tag e">e2e</span><code>smoke.spec.ts</code></li><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; CAPACIDADES, WORKERS</li><li>verify:android -&gt; AREA SEG (barra inferior acima da area do sistema)</li></ul></div>
+  </article>
+  <article class="cartao" id="C-PROTOTIPOS" data-busca="c-prototipos rotas de prototipo (spikes) paginas que exercitam os workers isolados; so viram rota com pdfkitty_spike=1. apps/web/src/app/spike/** apps/web/src/config/page-extensions.ts apps/web/scripts/verify-spike-excluded.mjs">
+    <header>
+      <code class="id">C-PROTOTIPOS</code>
+      <h3>Rotas de prototipo (spikes)</h3>
+      
+    </header>
+    <p>Paginas que exercitam os workers isolados; so viram rota com PDFKITTY_SPIKE=1.</p>
+    
+    <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-DOCUMENTOS</span><span class="chip comp">C-RENDERIZACAO</span><span class="chip comp">C-VERIFICACAO</span></div>
+    
+    <details><summary>Arquivos (3)</summary><ul class="arquivos"><li><code>apps/web/src/app/spike/**</code></li><li><code>apps/web/src/config/page-extensions.ts</code></li><li><code>apps/web/scripts/verify-spike-excluded.mjs</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>page-extensions.test.ts</code></li><li><span class="tag e">e2e</span><code>documents-worker.spec.ts</code></li><li><span class="tag e">e2e</span><code>redaction-worker.spec.ts</code></li><li><span class="tag e">e2e</span><code>sign-spike.spec.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>pnpm verify:spike-excluded (build limpo sem rotas de spike)</li></ul></div>
+  </article>
+  <article class="cartao" id="C-PLATAFORMA" data-busca="c-plataforma empacotamento tauri (windows e android) configuracao do tauri e csp, capacidades da ponte nativa e o projeto android sem a permissao internet. apps/desktop/src-tauri/tauri.conf.json apps/desktop/src-tauri/capabilities/** apps/desktop/src-tauri/{cargo.toml,cargo.lock,build.rs} apps/desktop/src-tauri/src/** apps/desktop/src-tauri/gen/** rnf-01 rnf-04">
+    <header>
+      <code class="id">C-PLATAFORMA</code>
+      <h3>Empacotamento Tauri (Windows e Android)</h3>
+      
+    </header>
+    <p>Configuracao do Tauri e CSP, capacidades da ponte nativa e o projeto Android sem a permissao INTERNET.</p>
+    <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-01</span><span class="chip req">RNF-04</span></div>
+    
+    
+    <details><summary>Arquivos (5)</summary><ul class="arquivos"><li><code>apps/desktop/src-tauri/tauri.conf.json</code></li><li><code>apps/desktop/src-tauri/capabilities/**</code></li><li><code>apps/desktop/src-tauri/{Cargo.toml,Cargo.lock,build.rs}</code></li><li><code>apps/desktop/src-tauri/src/**</code></li><li><code>apps/desktop/src-tauri/gen/**</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>invariantes.test.ts</code></li></ul></div>
+    <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>pnpm --filter desktop package + verify:desktop (pacote Windows inteiro)</li><li>android.ps1 build --debug --apk + verify:android (REDE e REDE s/CSP bloqueadas)</li></ul></div>
+  </article>
+  <article class="cartao" id="C-RASTREABILIDADE" data-busca="c-rastreabilidade matriz de rastreabilidade esta matriz, o calculo de impacto, o hook de pre-push e a pagina gerada. packages/rastreabilidade/src/**">
+    <header>
+      <code class="id">C-RASTREABILIDADE</code>
+      <h3>Matriz de rastreabilidade</h3>
+      
+    </header>
+    <p>Esta matriz, o calculo de impacto, o hook de pre-push e a pagina gerada.</p>
+    
+    
+    
+    <details><summary>Arquivos (1)</summary><ul class="arquivos"><li><code>packages/rastreabilidade/src/**</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>modelo.test.ts</code></li><li><span class="tag u">unit</span><code>integridade.test.ts</code></li></ul></div>
+    
+  </article></section>
+</main>
+<script>
+(() => {
+  const campo = document.querySelector('.busca');
+  const cartoes = [...document.querySelectorAll('.cartao')];
+  campo.addEventListener('input', () => {
+    const termo = campo.value.trim().toLowerCase();
+    for (const c of cartoes) c.hidden = termo !== '' && !c.dataset.busca.includes(termo);
+  });
+  const tabela = document.querySelector('.mapa');
+  tabela.addEventListener('mouseover', (evento) => {
+    const celula = evento.target.closest('td, th');
+    tabela.querySelectorAll('.foco, .foco-col').forEach((e) => e.classList.remove('foco', 'foco-col'));
+    if (!celula) return;
+    celula.closest('tbody tr')?.classList.add('foco');
+    const f = celula.dataset.f;
+    if (f) tabela.querySelectorAll('[data-f="' + f + '"]').forEach((e) => e.classList.add('foco-col'));
+  });
+  tabela.addEventListener('mouseleave', () => tabela.querySelectorAll('.foco, .foco-col').forEach((e) => e.classList.remove('foco', 'foco-col')));
+})();
+</script>
+</body>
+</html>

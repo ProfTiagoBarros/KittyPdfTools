@@ -82,6 +82,9 @@ packages/pdf-core/  Lógica de PDF pura, sem React e sem DOM
   src/composition/ src/split/ src/compression/ src/ocr/ src/redaction/ src/verification/
   src/browser/      rasterizador OffscreenCanvas + adaptadores
   src/testing/      rasterizador Node
+packages/rastreabilidade/  matriz requisito → código → testes, cálculo de impacto, página gerada
+.githooks/pre-push  roda os testes impactados antes de todo push
+docs/               rastreabilidade.html e RASTREABILIDADE.md (gerados), guia e revisão
 tools/              diagnóstico de motor, fora do produto
 ```
 
@@ -104,6 +107,8 @@ pnpm --filter web verify:desktop         # verifica o app Windows por dentro
 pnpm --filter web verify:android         # verifica o app Android por dentro
 pnpm --filter desktop package            # .exe portátil, .msi e instalador NSIS
 pnpm --filter desktop android:apk        # APK (android:aab, android:dev, android:init)
+pnpm test:impact [--listar|--tudo]       # testes de tudo o que a mudança pode quebrar
+pnpm rastreabilidade                     # regenera docs/ a partir da matriz
 ```
 
 Teste único: `pnpm --filter web test -- src/i18n -t "resolve textos"` ·
@@ -326,6 +331,8 @@ dividem o mesmo processo. Medido com dois PDFs escaneados de 200 páginas (287 M
 - `pdf-core`: imports relativos **sem** extensão (o Vitest reescreve, o Turbopack não).
 - Cancelamento cooperativo exige ceder o laço de eventos (`MessageChannel`, não `setTimeout`).
 - Pastas iniciadas por `_` são privadas no App Router e nunca viram rota.
+- Regra do `.gitignore` sem `/` inicial casa em **qualquer** nível: `documentos/` ignorava também
+  `app/spike/documentos/`, e arquivo novo ali sumiria em silêncio. Ancore na raiz.
 - Cada worker recebe **sua cópia** dos bytes: a transfer list destaca o buffer.
 - `font.encodeText` **não lança** para caractere fora da fonte — substitui em silêncio.
 - `catch` que engole a causa já custou caro **quatro vezes**. Mensagem traduzida na tela,
@@ -390,6 +397,33 @@ publicar. Os artefatos de teste ficam em `Desktop/PDFKitty-para-testar/`.
 
 **Ainda não existe:** keystore e APK de release, MSIX, build macOS/Linux, carimbo AD-RT,
 conformidade DOC-ICP-15, via cirúrgica de ofuscação.
+
+---
+
+## Rastreabilidade (antes e depois de toda mudança)
+
+Fonte única: `packages/rastreabilidade/src/matriz.ts` — 13 requisitos (US-01..08, RNF-01..05),
+9 funcionalidades (`F-*`) e 16 componentes (`C-*`), cada um com seus arquivos (por padrão de
+caminho), dependências, testes e verificação manual. Visão: `docs/rastreabilidade.html`.
+
+- **Antes de mexer:** ache o componente no mapa e veja quantas funcionalidades ele afeta.
+- **Depois:** `pnpm test:impact`. Componente alterado contamina, de forma transitiva, quem depende
+  dele; teste alterado roda só a si mesmo; documentação não roda nada; configuração,
+  dependências e apoio de teste (`exigemTudo`) rodam tudo. Typecheck e integridade, sempre.
+- **O `git push` roda isso sozinho** (`core.hooksPath = .githooks`, ativado pelo `prepare` do
+  `pnpm install`) e recusa o envio se algum teste impactado falhar.
+- **Arquivo novo exige linha na matriz.** `integridade.test.ts` falha com arquivo de produto sem
+  dono, dois donos, teste que ninguém cita, teste citado que não existe, padrão que não casa com
+  nada, funcionalidade sem E2E, rota sem página, requisito sem quem o atenda e ciclo entre
+  componentes — e com `docs/` desatualizado. Dois donos para um arquivo é sinal de que ele faz
+  duas coisas: divida o arquivo, não a regra.
+- `invariantes.test.ts` fixa as Regras de Ouro que moram na configuração: Android sem INTERNET,
+  CSP fechada, ponte sem `fs:`, `.gitignore` barrando `.pfx`/`.p12`/`/documentos/`, nenhum
+  certificado ou keystore versionado.
+- Testes nativos do plugin: `cargo test --manifest-path apps/desktop/plugins/saf-save/Cargo.toml`
+  (com `CARGO_TARGET_DIR=apps/desktop/src-tauri/target` para reaproveitar a compilação do app).
+- O pacote roda direto no Node 24 (type stripping): imports com `.ts` e só sintaxe apagável. Sem
+  dependência de glob, de propósito — roda num hook, numa máquina que pode ser nova.
 
 ---
 

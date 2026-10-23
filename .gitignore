@@ -51,7 +51,10 @@ apps/web/public/tesseract/
 
 # Documentos reais usados em testes manuais (dados pessoais, LGPD). Nunca versionar: para medir
 # desempenho, use fixtures sinteticas com o mesmo peso.
-documentos/
+/documentos/
 
 # Cache incremental do TypeScript: artefato de build, muda a cada typecheck.
 *.tsbuildinfo
+
+# Crate de biblioteca: quem fixa as versoes e o Cargo.lock do app (src-tauri).
+apps/desktop/plugins/saf-save/Cargo.lock

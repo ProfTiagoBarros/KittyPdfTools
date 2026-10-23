@@ -18,7 +18,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml,css}\"",
     "test:coverage": "turbo run test:coverage",
-    "verify:spike-excluded": "turbo run verify:spike-excluded"
+    "verify:spike-excluded": "turbo run verify:spike-excluded",
+    "prepare": "git config core.hooksPath .githooks",
+    "rastreabilidade": "node packages/rastreabilidade/src/gerar.ts",
+    "test:impact": "node packages/rastreabilidade/src/impacto.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

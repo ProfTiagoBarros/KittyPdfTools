@@ -5,3 +5,7 @@ dist
 .turbo
 pnpm-lock.yaml
 referencias
+
+# Gerados pela matriz (pnpm rastreabilidade): o teste de integridade compara byte a byte.
+docs/rastreabilidade.html
+docs/RASTREABILIDADE.md
