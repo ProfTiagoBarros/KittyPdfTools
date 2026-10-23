@@ -106,6 +106,8 @@ pnpm --filter web sync:assets            # pdf.js + Tesseract para public/
 pnpm --filter web verify:desktop         # verifica o app Windows por dentro
 pnpm --filter web verify:android         # verifica o app Android por dentro
 pnpm --filter desktop package            # .exe portátil, .msi e instalador NSIS
+pnpm build:windows                       # 64+32 bits → Desktop\PDFKitty-builds, abre a pasta
+                                         # (duplo clique: compilar-windows.cmd; -Bits 64|32)
 pnpm --filter desktop android:apk        # APK (android:aab, android:dev, android:init)
 pnpm test:impact [--listar|--tudo]       # testes de tudo o que a mudança pode quebrar
 pnpm rastreabilidade                     # regenera docs/ a partir da matriz

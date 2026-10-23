@@ -21,7 +21,8 @@
     "verify:spike-excluded": "turbo run verify:spike-excluded",
     "prepare": "git config core.hooksPath .githooks",
     "rastreabilidade": "node packages/rastreabilidade/src/gerar.ts",
-    "test:impact": "node packages/rastreabilidade/src/impacto.ts"
+    "test:impact": "node packages/rastreabilidade/src/impacto.ts",
+    "build:windows": "pnpm --filter desktop windows"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -6,6 +6,7 @@
     "tauri": "tauri",
     "dev:desktop": "tauri dev",
     "package": "tauri build",
+    "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows.ps1",
     "clean": "rimraf src-tauri/target src-tauri/gen",
     "android:init": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 init",
     "android:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 dev",
