@@ -93,7 +93,7 @@ function SignToolInner() {
       produce: async () => {
         try {
           const composed = await services.documents.compose(toPageRefs(items));
-          const buffer = composed.slice().buffer;
+          const buffer = await composed.arrayBuffer();
           const signed = await session.sign(buffer, reason, location);
 
           // Assinou: a sessao acaba aqui. Manter o worker vivo prolongaria a existencia da

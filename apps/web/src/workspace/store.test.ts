@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createWorkspaceStore, openDocumentIds, sessionStore, splitStore } from './store';
+import { createWorkspaceStore, sessionStore, splitStore } from './store';
 
 const doc = (id: string, pageCount: number) => ({ id, name: `${id}.pdf`, pageCount });
 const state = () => sessionStore.getState();
@@ -185,13 +185,6 @@ describe('espacos de trabalho separados', () => {
 
     const todas = [...keys(), ...outro.getState().items.map((item) => item.key)];
     expect(new Set(todas).size).toBe(6);
-  });
-
-  it('quem reabre documentos depois de liberar a memoria enxerga os dois espacos', () => {
-    state().addDocument(doc('juntos', 1));
-    splitStore.getState().addDocument(doc('dividir', 1));
-
-    expect(openDocumentIds().sort()).toEqual(['dividir', 'juntos']);
   });
 });
 

@@ -20,7 +20,7 @@ interface DocsReport {
   progressEvents: number;
   cancelledAsCancellation: boolean;
   errorForUnknownDocument: string;
-  bytesStayInWorker: boolean;
+  loadDoesNotRead: boolean;
 }
 
 declare global {
@@ -52,15 +52,16 @@ test.describe('worker de documentos', () => {
     await page.close();
   });
 
-  test('o worker informa a contagem de paginas ao carregar', () => {
+  test('os documentos de teste tem a contagem esperada', () => {
     expect(report.pageCountA).toBe(2);
     expect(report.pageCountB).toBe(3);
   });
 
-  test('os bytes passam a pertencer ao worker', () => {
-    // A transfer list destaca o buffer do lado da UI: e a decisao "o worker e dono dos
-    // bytes" observavel, e nao apenas documentada.
-    expect(report.bytesStayInWorker).toBe(true);
+  test('registrar um documento nao le o arquivo', () => {
+    // O worker guarda o `File` e le so quando uma operacao precisa: ate um arquivo que nao e
+    // PDF e aceito no registro. Quem recusa e o worker de renderizacao, ao abrir para contar
+    // as paginas. Ler aqui custava o arquivo inteiro na memoria por documento aberto.
+    expect(report.loadDoesNotRead).toBe(true);
   });
 
   test('US-01 — compoe paginas de origens diferentes, na ordem pedida', () => {

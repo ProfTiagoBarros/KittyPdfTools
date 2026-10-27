@@ -23,14 +23,13 @@ export class OperationCancelled extends Error {
 
 export interface DocumentWorkspace {
   /**
-   * Envia um PDF ao worker. O `ArrayBuffer` informado e DESTACADO pela transfer list: a
-   * partir daqui os bytes pertencem ao worker, e a UI guarda apenas o identificador.
+   * Registra o arquivo de um documento no worker, sem le-lo: os bytes so entram na memoria
+   * quando uma operacao precisa daquela origem.
    */
-  load(documentId: string, bytes: ArrayBuffer): Promise<number>;
+  load(documentId: string, file: Blob): Promise<void>;
   unload(documentId: string): Promise<void>;
-  /** Copia dos bytes de um documento carregado, para o worker de renderizacao reabri-lo. */
-  copyOf(documentId: string): Promise<ArrayBuffer>;
-  compose(composition: readonly PageRef[]): Promise<Uint8Array>;
+  /** Monta a composicao em fluxo; o resultado chega como `Blob`, fora da memoria da pagina. */
+  compose(composition: readonly PageRef[]): Promise<Blob>;
   extract(documentId: string, spec: string): Promise<Uint8Array>;
   splitByRanges(
     documentId: string,
@@ -44,11 +43,7 @@ export interface DocumentWorkspace {
    * Nao e um caso particular de dividir: a intencao e outra, e por isso o resultado tambem e
    * — um `.pdf` direto, sem o pacote que so faz sentido quando existem varios arquivos.
    */
-  extractComposition(
-    composition: readonly PageRef[],
-    spec: string,
-    options?: OperationOptions,
-  ): Promise<Uint8Array>;
+  extractComposition(composition: readonly PageRef[], spec: string): Promise<Blob>;
   /** Divide a composicao montada na grade, sem passar o PDF pela main thread. */
   splitComposition(
     composition: readonly PageRef[],
@@ -125,9 +120,9 @@ export function createDocumentWorkspace(): DocumentWorkspace {
   }
 
   return {
-    async load(documentId, bytes) {
-      return send({ kind: 'load', id: newId(), documentId, bytes }, [bytes], (message) =>
-        message.kind === 'loaded' ? message.pageCount : undefined,
+    async load(documentId, file) {
+      await send({ kind: 'load', id: newId(), documentId, file }, [], (message) =>
+        message.kind === 'loaded' ? true : undefined,
       );
     },
 
@@ -137,17 +132,10 @@ export function createDocumentWorkspace(): DocumentWorkspace {
       );
     },
 
-    async copyOf(documentId) {
-      return send({ kind: 'copy', id: newId(), documentId }, [], (message) =>
-        message.kind === 'copied' ? message.bytes : undefined,
-      );
-    },
-
     async compose(composition) {
-      const pdf = await send({ kind: 'compose', id: newId(), composition }, [], (message) =>
-        message.kind === 'built' ? message.pdf : undefined,
+      return send({ kind: 'compose', id: newId(), composition }, [], (message) =>
+        message.kind === 'composed' ? message.pdf : undefined,
       );
-      return new Uint8Array(pdf);
     },
 
     async extract(documentId, spec) {
@@ -180,17 +168,10 @@ export function createDocumentWorkspace(): DocumentWorkspace {
       };
     },
 
-    async extractComposition(composition, spec, options) {
-      const result = await send(
-        { kind: 'splitComposition', id: newId(), composition, mode: { kind: 'extract', spec } },
-        [],
-        (message) => (message.kind === 'volumes' ? message : undefined),
-        options,
+    async extractComposition(composition, spec) {
+      return send({ kind: 'extractComposition', id: newId(), composition, spec }, [], (message) =>
+        message.kind === 'composed' ? message.pdf : undefined,
       );
-
-      const [volume] = result.volumes;
-      if (volume === undefined) throw new Error('worker nao devolveu documento extraido');
-      return new Uint8Array(volume);
     },
 
     async splitComposition(composition, mode, options) {

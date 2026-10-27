@@ -30,8 +30,8 @@ use tauri::Manager;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("destino ausente no cabecalho da requisicao")]
-    MissingDestination,
+    #[error("cabecalho '{0}' ausente na requisicao")]
+    MissingHeader(&'static str),
     #[error("o corpo da requisicao nao traz bytes")]
     SemBytes,
     #[error(transparent)]
@@ -71,20 +71,38 @@ struct DiscardPayload {
     destination: String,
 }
 
-/// Grava `bytes` (corpo binario da requisicao) no destino do cabecalho `destination`.
-#[tauri::command]
-async fn save_to_uri<R: Runtime>(app: AppHandle<R>, request: Request<'_>) -> Result<()> {
-    let destination = request
+fn header<'a>(request: &'a Request<'_>, name: &'static str) -> Result<&'a str> {
+    request
         .headers()
-        .get("destination")
+        .get(name)
         .and_then(|value| value.to_str().ok())
-        .ok_or(Error::MissingDestination)?
-        .to_string();
+        .ok_or(Error::MissingHeader(name))
+}
 
-    // O custo do caminho JSON do Android e alto (um PDF de 5 MB viaja como texto de dezenas
-    // de MB), mas quem escolhe o transporte e o Tauri, nao nos.
+/**
+ * Grava um PEDACO do arquivo num temporario: o cabecalho `append` diz se comeca do zero (`0`)
+ * ou acrescenta (`1`).
+ *
+ * Em pedacos porque o arquivo inteiro numa requisicao so era uma copia do tamanho do
+ * documento dentro da ponte — 551 MB ao unir oito PDFs escaneados, somados ao que a tela ja
+ * ocupava. No Android, onde o corpo vira array JSON (~3,6x maior), um arquivo assim nem cabia.
+ *
+ * O destino so e tocado em `finish_write`: se a gravacao falhar no meio, o arquivo que o
+ * usuario escolheu sobrescrever continua inteiro.
+ */
+#[tauri::command]
+async fn write_chunk<R: Runtime>(app: AppHandle<R>, request: Request<'_>) -> Result<()> {
+    let destination = header(&request, "destination")?;
+    let append = header(&request, "append")? == "1";
     let bytes = bytes_from_body(request.body())?;
-    write_bytes(&app, &destination, &bytes)
+    disk::write_chunk(&partial_path(&app, destination)?, &bytes, append)
+}
+
+/// Poe o temporario completo no destino escolhido.
+#[tauri::command]
+async fn finish_write<R: Runtime>(app: AppHandle<R>, destination: String) -> Result<()> {
+    let partial = partial_path(&app, &destination)?;
+    finish(&app, &partial, &destination)
 }
 
 /**
@@ -126,6 +144,8 @@ fn bytes_from_body(body: &InvokeBody) -> Result<Cow<'_, [u8]>> {
  */
 #[tauri::command]
 async fn discard_uri<R: Runtime>(app: AppHandle<R>, destination: String) -> Result<()> {
+    // O temporario de uma gravacao interrompida tambem sai: e uma copia do documento.
+    let _ = std::fs::remove_file(partial_path(&app, &destination)?);
     discard(&app, &destination)
 }
 
@@ -173,20 +193,77 @@ fn discard<R: Runtime>(app: &AppHandle<R>, destination: &str) -> Result<()> {
     app.saf_save().discard_uri(destination.to_string())
 }
 
+/// No desktop o temporario fica AO LADO do destino: mesmo volume, entao `rename` o poe no lugar
+/// de uma vez, sem copiar de novo.
 #[cfg(not(target_os = "android"))]
-fn write_bytes<R: Runtime>(_app: &AppHandle<R>, destination: &str, bytes: &[u8]) -> Result<()> {
-    disk::write(std::path::Path::new(destination), bytes)
+fn partial_path<R: Runtime>(_app: &AppHandle<R>, destination: &str) -> Result<std::path::PathBuf> {
+    Ok(disk::partial_path(std::path::Path::new(destination)))
 }
 
-/// Gravacao no desktop, onde o destino e um caminho comum. Separada do `AppHandle` para ser
-/// testavel sem subir o Tauri.
+/// No Android o destino e um content URI, sem pasta onde por um vizinho: o temporario vai para o
+/// cache do proprio app.
+#[cfg(target_os = "android")]
+fn partial_path<R: Runtime>(app: &AppHandle<R>, destination: &str) -> Result<std::path::PathBuf> {
+    use std::hash::{Hash, Hasher};
+    let cache = app.path().app_cache_dir()?;
+    std::fs::create_dir_all(&cache)?;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    destination.hash(&mut hasher);
+    Ok(cache.join(format!("saf-save-{:016x}.tmp", hasher.finish())))
+}
+
 #[cfg(not(target_os = "android"))]
+fn finish<R: Runtime>(_app: &AppHandle<R>, partial: &std::path::Path, destination: &str) -> Result<()> {
+    disk::finish(partial, std::path::Path::new(destination))
+}
+
+#[cfg(target_os = "android")]
+fn finish<R: Runtime>(app: &AppHandle<R>, partial: &std::path::Path, destination: &str) -> Result<()> {
+    /*
+     * Passa pelo disco, e nao pela ponte, de proposito: os argumentos de um comando do plugin
+     * Android trafegam como JSON, e mandar o documento por ali duplicaria o arquivo inteiro na
+     * memoria do aparelho. O Kotlin copia do temporario para o documento pelo content resolver.
+     */
+    let resultado = app.saf_save().copy_to_uri(
+        partial.to_string_lossy().to_string(),
+        destination.to_string(),
+    );
+
+    // O temporario sai mesmo se a copia falhar: o documento do usuario nao pode ficar
+    // duplicado no cache por causa de um erro.
+    let _ = std::fs::remove_file(partial);
+
+    resultado
+}
+
+/// Operacoes de arquivo puras, separadas do `AppHandle` para serem testaveis sem subir o Tauri.
+#[cfg_attr(target_os = "android", allow(dead_code))]
 mod disk {
     use super::Result;
-    use std::path::Path;
+    use std::io::Write;
+    use std::path::{Path, PathBuf};
 
-    pub fn write(destination: &Path, bytes: &[u8]) -> Result<()> {
-        std::fs::write(destination, bytes)?;
+    /// Grava um pedaco: do zero quando `append` e falso, no fim do arquivo quando verdadeiro.
+    pub fn write_chunk(path: &Path, bytes: &[u8], append: bool) -> Result<()> {
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(append)
+            .truncate(!append)
+            .open(path)?;
+        file.write_all(bytes)?;
+        Ok(())
+    }
+
+    pub fn partial_path(destination: &Path) -> PathBuf {
+        let mut nome = destination.as_os_str().to_owned();
+        nome.push(".pdfkitty-parcial");
+        PathBuf::from(nome)
+    }
+
+    /// Troca o destino pelo temporario completo. Substitui o arquivo que ja existia la.
+    pub fn finish(partial: &Path, destination: &Path) -> Result<()> {
+        std::fs::rename(partial, destination)?;
         Ok(())
     }
 
@@ -208,33 +285,6 @@ mod disk {
             _ => false,
         }
     }
-}
-
-#[cfg(target_os = "android")]
-fn write_bytes<R: Runtime>(app: &AppHandle<R>, destination: &str, bytes: &[u8]) -> Result<()> {
-    /*
-     * Passa pelo disco, e nao pela ponte, de proposito.
-     *
-     * Os argumentos de um comando do plugin Android trafegam como JSON: mandar os bytes por
-     * ali exigiria base64, o que cresce o payload em um terco e duplica o documento inteiro na
-     * memoria de um aparelho movel. Um arquivo temporario no cache do proprio app custa uma
-     * copia em disco e mantem a ponte com duas strings.
-     */
-    let cache = app.path().app_cache_dir()?;
-    std::fs::create_dir_all(&cache)?;
-    let temporario = cache.join("saf-save.tmp");
-    std::fs::write(&temporario, bytes)?;
-
-    let resultado = app.saf_save().copy_to_uri(
-        temporario.to_string_lossy().to_string(),
-        destination.to_string(),
-    );
-
-    // O temporario sai mesmo se a copia falhar: o documento do usuario nao pode ficar
-    // duplicado no cache por causa de um erro.
-    let _ = std::fs::remove_file(&temporario);
-
-    resultado
 }
 
 #[cfg(target_os = "android")]
@@ -308,7 +358,12 @@ use android::SafSaveExt;
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("saf-save")
-        .invoke_handler(tauri::generate_handler![save_to_uri, copy_saved, discard_uri])
+        .invoke_handler(tauri::generate_handler![
+            write_chunk,
+            finish_write,
+            copy_saved,
+            discard_uri
+        ])
         .setup(|_app, _api| {
             #[cfg(target_os = "android")]
             {
@@ -350,7 +405,7 @@ mod tests {
     mod disco {
         use super::super::disk;
         use std::fs;
-        use std::path::PathBuf;
+        use std::path::{Path, PathBuf};
 
         fn pasta(nome: &str) -> PathBuf {
             let pasta = std::env::temp_dir().join(format!("saf-save-teste-{nome}-{}", std::process::id()));
@@ -360,11 +415,41 @@ mod tests {
         }
 
         #[test]
-        fn grava_os_bytes_inteiros() {
-            let pasta = pasta("grava");
-            let destino = pasta.join("saida.pdf");
-            disk::write(&destino, b"%PDF-1.7 ... %%EOF").unwrap();
-            assert_eq!(fs::read(&destino).unwrap(), b"%PDF-1.7 ... %%EOF");
+        fn pedacos_se_juntam_na_ordem_e_o_primeiro_zera_o_arquivo() {
+            let pasta = pasta("pedacos");
+            let parcial = pasta.join("saida.pdf.pdfkitty-parcial");
+            fs::write(&parcial, b"lixo de uma tentativa anterior").unwrap();
+
+            disk::write_chunk(&parcial, b"%PDF-1.7 ", false).unwrap();
+            disk::write_chunk(&parcial, b"meio ", true).unwrap();
+            disk::write_chunk(&parcial, b"%%EOF", true).unwrap();
+
+            assert_eq!(fs::read(&parcial).unwrap(), b"%PDF-1.7 meio %%EOF");
+            fs::remove_dir_all(pasta).unwrap();
+        }
+
+        #[test]
+        fn o_temporario_fica_ao_lado_do_destino() {
+            let destino = Path::new("C:/pasta/contrato.pdf");
+            let parcial = disk::partial_path(destino);
+            assert_eq!(parcial.parent(), destino.parent());
+            assert_ne!(parcial, destino);
+        }
+
+        #[test]
+        fn o_destino_so_muda_no_fim_e_entao_e_substituido() {
+            let pasta = pasta("fim");
+            let destino = pasta.join("contrato.pdf");
+            fs::write(&destino, b"versao antiga").unwrap();
+            let parcial = disk::partial_path(&destino);
+
+            disk::write_chunk(&parcial, b"versao nova", false).unwrap();
+            // Gravacao interrompida aqui deixaria o arquivo do usuario intacto.
+            assert_eq!(fs::read(&destino).unwrap(), b"versao antiga");
+
+            disk::finish(&parcial, &destino).unwrap();
+            assert_eq!(fs::read(&destino).unwrap(), b"versao nova");
+            assert!(!parcial.exists());
             fs::remove_dir_all(pasta).unwrap();
         }
 

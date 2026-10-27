@@ -20,7 +20,7 @@ import { getTool } from '@/tools/registry';
 import { usePageSpec, type PageSpec } from '@/workspace/page-spec';
 import { PageRangeField } from './page-range-field';
 
-type ModeId = Exclude<SplitMode['kind'], 'extract'>;
+type ModeId = SplitMode['kind'];
 
 interface ModeOption {
   readonly id: ModeId;

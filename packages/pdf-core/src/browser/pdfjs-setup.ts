@@ -1,4 +1,4 @@
-import { GlobalWorkerOptions } from 'pdfjs-dist';
+import { GlobalWorkerOptions, PDFDataRangeTransport } from 'pdfjs-dist';
 
 /**
  * Aponta o pdf.js para os arquivos servidos pela aplicacao.
@@ -151,9 +151,51 @@ export interface DocumentOptionsConfig {
   readonly adopt?: boolean;
 }
 
-export function pdfjsDocumentOptions(pdf: Uint8Array, config: DocumentOptionsConfig = {}) {
+/**
+ * Entrega ao pdf.js so as faixas do arquivo que ele pede.
+ *
+ * Abrir com o arquivo inteiro na memoria custava o tamanho dele so para contar as paginas: oito
+ * PDFs escaneados de 70 a 95 MB eram lidos por inteiro ao abrir, e o que o pdf.js realmente le
+ * para isso e o fim do arquivo, a tabela de objetos e o catalogo. Uma miniatura le a pagina e
+ * a imagem dela, nada mais. Fatias de um `Blob` sao leituras de disco, sem copiar o resto.
+ */
+class BlobRangeTransport extends PDFDataRangeTransport {
+  constructor(private readonly file: Blob) {
+    super(file.size, null);
+  }
+
+  override requestDataRange(begin: number, end: number): void {
+    void this.file
+      .slice(begin, end)
+      .arrayBuffer()
+      .then((chunk) => this.onDataRange(begin, new Uint8Array(chunk)))
+      // Sem dados, o pdf.js fica esperando: devolver nada faz a leitura falhar com erro dele,
+      // que chega a quem abriu, em vez de travar a pagina.
+      .catch((cause: unknown) => {
+        console.error('Falha ao ler faixa do arquivo', { begin, end }, cause);
+        this.onDataRange(begin, null);
+      });
+  }
+}
+
+/** Faixas de 512 KB: uma pagina escaneada (~700 KB) sai em duas leituras, e nao em onze. */
+const RANGE_CHUNK_BYTES = 512 * 1024;
+
+export function pdfjsDocumentOptions(pdf: Uint8Array | Blob, config: DocumentOptionsConfig = {}) {
+  const source =
+    pdf instanceof Blob
+      ? {
+          range: new BlobRangeTransport(pdf),
+          length: pdf.size,
+          rangeChunkSize: RANGE_CHUNK_BYTES,
+          // Le so o que e pedido; sem isso o pdf.js baixaria o resto em segundo plano.
+          disableAutoFetch: true,
+          disableStream: true,
+        }
+      : { data: config.adopt === true ? pdf : new Uint8Array(pdf) };
+
   return {
-    data: config.adopt === true ? pdf : new Uint8Array(pdf),
+    ...source,
 
     /*
      * Sem `@font-face`, e por isso sem DOM.

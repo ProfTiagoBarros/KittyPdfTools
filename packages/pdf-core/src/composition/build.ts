@@ -1,6 +1,7 @@
 import { PDFDocument, degrees, type PDFPage } from '@cantoo/pdf-lib';
-import type { Composition, PageRef, SourceDocument, SourceId } from './types';
+import type { Composition, LazySource, PageRef, SourceDocument, SourceId } from './types';
 import { coreError } from '../errors';
+import { concatChunks, StreamingPdfWriter, type ChunkSink } from './writer';
 
 /**
  * Materializa a composicao num PDF.
@@ -17,6 +18,38 @@ export async function buildComposition(
   sources: readonly SourceDocument[],
   composition: Composition,
 ): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  await writeComposition(
+    sources.map((source) => ({ id: source.id, load: () => Promise.resolve(source.bytes) })),
+    composition,
+    (chunk) => {
+      chunks.push(chunk);
+    },
+  );
+  return concatChunks(chunks);
+}
+
+/**
+ * Monta a composicao gravando o resultado em pedacos, sem nunca te-lo inteiro na memoria.
+ *
+ * UMA origem por vez: carrega, copia as paginas pedidas, grava tudo o que elas trouxeram
+ * (imagens, fluxos de conteudo, fontes) e solta — antes de carregar a proxima. O pdf-lib copia
+ * o conteudo dos fluxos ao interpretar e de novo ao levar as paginas para o documento novo;
+ * acumulando o resultado no contexto, o `save()` ainda alocava o arquivo inteiro de uma vez.
+ * Medido unindo 816 paginas escaneadas (551 MB): passava de 3 GB e a tela do app ficava
+ * preta. Assim o pico e o de uma origem mais um pedaco, qualquer que seja o total.
+ *
+ * Os dicionarios de pagina ficam por ultimo, porque e na montagem final que recebem a rotacao
+ * e o lugar na arvore de paginas; sao pequenos. Ficam tambem a arvore, o catalogo e as
+ * informacoes do documento.
+ *
+ * Devolve o tamanho gravado. `sources` pode carregar sob demanda: so a origem da vez existe.
+ */
+export async function writeComposition(
+  sources: readonly LazySource[],
+  composition: Composition,
+  sink: ChunkSink,
+): Promise<number> {
   if (composition.length === 0) {
     throw coreError('EMPTY_COMPOSITION', {}, 'Composicao vazia');
   }
@@ -24,29 +57,28 @@ export async function buildComposition(
   const byId = indexSources(sources);
   const plan = planCopies(composition, byId);
   const output = await PDFDocument.create();
+  const writer = await StreamingPdfWriter.start(output.context, sink);
 
-  /*
-   * UMA origem por vez: carrega, copia as paginas pedidas e solta, antes de carregar a
-   * proxima.
-   *
-   * O pdf-lib copia o conteudo de cada stream ao interpretar o arquivo, e copia de novo ao
-   * levar as paginas para o documento novo. Carregando todas as origens antes de copiar,
-   * as versoes interpretadas de TODAS ficavam vivas ate o fim — medido com dois PDFs de 200
-   * paginas: a juncao passava de 1,8 GB, acima do que um Windows 32 bits da a um processo.
-   * Soltando cada origem assim que suas paginas foram copiadas, o coletor de lixo pode
-   * recupera-la antes que a proxima seja aberta e antes de o resultado ser serializado.
-   *
-   * Dentro de cada origem, todas as paginas vao numa unica chamada: copiar de uma em uma
-   * refaz o grafo de objetos a cada pagina, o que fica lento em documentos grandes.
-   */
+  // Dentro de cada origem, todas as paginas vao numa unica chamada: copiar de uma em uma
+  // refaz o grafo de objetos a cada pagina, o que fica lento em documentos grandes.
   const copied = new Map<SourceId, PDFPage[]>();
   for (const [id, refs] of plan) {
-    const bytes = byId.get(id);
-    if (bytes === undefined) {
+    const load = byId.get(id);
+    if (load === undefined) {
       throw coreError('INTERNAL', { detail: `origem '${id}' ausente` }, 'Origem ausente');
     }
-    const source = await PDFDocument.load(bytes);
-    copied.set(id, await output.copyPages(source, validatedIndices(id, refs, source)));
+
+    const antes = output.context.largestObjectNumber;
+    const source = await PDFDocument.load(await load());
+    const pages = await output.copyPages(source, validatedIndices(id, refs, source));
+    copied.set(id, pages);
+
+    const paginas = new Set(pages.map((page) => page.ref.objectNumber));
+    const trazidos = output.context
+      .enumerateIndirectObjects()
+      .map(([ref]) => ref)
+      .filter((ref) => ref.objectNumber > antes && !paginas.has(ref.objectNumber));
+    await writer.writeAndRelease(trazidos);
   }
 
   const cursors = new Map<SourceId, number>();
@@ -71,7 +103,7 @@ export async function buildComposition(
     output.addPage(page);
   }
 
-  return output.save({ useObjectStreams: false });
+  return writer.finish();
 }
 
 /** Numero de paginas de um documento, sem materializar nada. */
@@ -91,15 +123,17 @@ export async function composeAllPages(sources: readonly SourceDocument[]): Promi
   return refs;
 }
 
+type Loader = LazySource['load'];
+
 /** Indexa as origens por id, recusando duplicatas sem carregar nenhuma delas. */
-function indexSources(sources: readonly SourceDocument[]): Map<SourceId, Uint8Array> {
-  const byId = new Map<SourceId, Uint8Array>();
+function indexSources(sources: readonly LazySource[]): Map<SourceId, Loader> {
+  const byId = new Map<SourceId, Loader>();
 
   for (const source of sources) {
     if (byId.has(source.id)) {
       throw coreError('DUPLICATE_SOURCE', { source: source.id }, `Origem duplicada: ${source.id}`);
     }
-    byId.set(source.id, source.bytes);
+    byId.set(source.id, source.load);
   }
 
   return byId;
@@ -114,7 +148,7 @@ function indexSources(sources: readonly SourceDocument[]): Map<SourceId, Uint8Ar
  */
 function planCopies(
   composition: Composition,
-  byId: Map<SourceId, Uint8Array>,
+  byId: Map<SourceId, Loader>,
 ): Map<SourceId, PageRef[]> {
   const plan = new Map<SourceId, PageRef[]>();
 

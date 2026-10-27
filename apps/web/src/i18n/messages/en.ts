@@ -87,6 +87,7 @@ export const en: Messages = {
 
   'error.loadFailed': 'Could not read {file}. The file may be damaged or protected.',
   'save.failed': 'Could not save the file.',
+  'longOperation.message': 'The program is performing a lengthy operation, please wait a moment.',
   'generation.copyFailed':
     'Could not find the saved file. It may have been moved or deleted; generate again for another copy.',
   'generation.tooBigToKeep':

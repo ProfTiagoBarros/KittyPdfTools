@@ -95,7 +95,7 @@ ul.arquivos li, ul.testes li { padding: 2px 0; overflow-wrap: anywhere; }
     <div class="numero"><b>13</b><span>requisitos</span></div>
     <div class="numero"><b>8</b><span>funcionalidades</span></div>
     <div class="numero"><b>16</b><span>componentes</span></div>
-    <div class="numero"><b>25</b><span>testes unitarios</span></div>
+    <div class="numero"><b>27</b><span>testes unitarios</span></div>
     <div class="numero"><b>12</b><span>specs E2E</span></div>
     <div class="numero"><b>1</b><span>suites nativas</span></div>
   </section>
@@ -254,18 +254,18 @@ pnpm rastreabilidade        # regenera esta pagina</code></pre>
     <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>core-errors.test.ts</code></li></ul></div>
     
   </article>
-  <article class="cartao" id="C-COMPOSICAO" data-busca="c-composicao composicao de paginas (pdf-lib) materializa a lista de paginas num pdf, carregando uma origem por vez. packages/pdf-core/src/composition/** rnf-03">
+  <article class="cartao" id="C-COMPOSICAO" data-busca="c-composicao composicao de paginas (pdf-lib) materializa a lista de paginas num pdf em fluxo: uma origem por vez, gravando e soltando o conteudo antes da proxima. packages/pdf-core/src/composition/** rnf-03">
     <header>
       <code class="id">C-COMPOSICAO</code>
       <h3>Composicao de paginas (pdf-lib)</h3>
       
     </header>
-    <p>Materializa a lista de paginas num PDF, carregando uma origem por vez.</p>
+    <p>Materializa a lista de paginas num PDF em fluxo: uma origem por vez, gravando e soltando o conteudo antes da proxima.</p>
     <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-03</span></div>
     <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-NUCLEO</span></div>
     <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
     <details><summary>Arquivos (1)</summary><ul class="arquivos"><li><code>packages/pdf-core/src/composition/**</code></li></ul></details>
-    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>build.test.ts</code></li></ul></div>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>build.test.ts</code></li><li><span class="tag u">unit</span><code>writer.test.ts</code></li></ul></div>
     
   </article>
   <article class="cartao" id="C-VERIFICACAO" data-busca="c-verificacao verificacao de vazamento extrai texto e procura bytes num pdf: e como se prova que uma ofuscacao e real. packages/pdf-core/src/verification/** packages/pdf-core/src/browser/verification.ts">
@@ -352,18 +352,18 @@ pnpm rastreabilidade        # regenera esta pagina</code></pre>
     <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>core-errors.test.ts</code></li><li><span class="tag u">unit</span><code>registry.test.ts</code></li><li><span class="tag u">unit</span><code>use-translation.test.tsx</code></li></ul></div>
     
   </article>
-  <article class="cartao" id="C-GERACAO" data-busca="c-geracao fluxo de geracao e gravacao destino antes de gerar, progresso, ultima geracao, gravacao pelo plugin proprio (rust + kotlin) e copia do arquivo ja salvo. apps/web/src/lib/generation.ts apps/web/src/lib/save-pdf.ts apps/web/src/components/workspace/generation-action.tsx apps/desktop/plugins/saf-save/src/** apps/desktop/plugins/saf-save/android/src/** apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro} apps/desktop/plugins/saf-save/{cargo.toml,build.rs} apps/desktop/plugins/saf-save/permissions/default.toml rnf-03">
+  <article class="cartao" id="C-GERACAO" data-busca="c-geracao fluxo de geracao e gravacao destino antes de gerar, progresso, aviso de operacao demorada, ultima geracao, gravacao em pedacos pelo plugin proprio (rust + kotlin) e copia do arquivo ja salvo. apps/web/src/lib/generation.ts apps/web/src/lib/save-pdf.ts apps/web/src/components/workspace/generation-action.tsx apps/web/src/workspace/long-operation.ts apps/web/src/components/workspace/long-operation-notice.tsx apps/desktop/plugins/saf-save/src/** apps/desktop/plugins/saf-save/android/src/** apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro} apps/desktop/plugins/saf-save/{cargo.toml,build.rs} apps/desktop/plugins/saf-save/permissions/default.toml rnf-03">
     <header>
       <code class="id">C-GERACAO</code>
       <h3>Fluxo de geracao e gravacao</h3>
       
     </header>
-    <p>Destino antes de gerar, progresso, ultima geracao, gravacao pelo plugin proprio (Rust + Kotlin) e copia do arquivo ja salvo.</p>
+    <p>Destino antes de gerar, progresso, aviso de operacao demorada, ultima geracao, gravacao em pedacos pelo plugin proprio (Rust + Kotlin) e copia do arquivo ja salvo.</p>
     <div class="linha"><span class="rotulo">Requisitos</span><span class="chip req">RNF-03</span></div>
     <div class="linha"><span class="rotulo">Usa</span><span class="chip comp">C-I18N</span><span class="chip comp">C-NUCLEO</span></div>
     <div class="linha alerta"><span class="rotulo">Mexer aqui afeta</span><span class="chip func">F-UNIR</span><span class="chip func">F-DIVIDIR</span><span class="chip func">F-COMPACTAR</span><span class="chip func">F-OCR</span><span class="chip func">F-ASSINAR</span><span class="chip func">F-OFUSCAR</span><span class="chip func">F-BUSCA</span><span class="chip func">F-LUPA</span></div>
-    <details><summary>Arquivos (8)</summary><ul class="arquivos"><li><code>apps/web/src/lib/generation.ts</code></li><li><code>apps/web/src/lib/save-pdf.ts</code></li><li><code>apps/web/src/components/workspace/generation-action.tsx</code></li><li><code>apps/desktop/plugins/saf-save/src/**</code></li><li><code>apps/desktop/plugins/saf-save/android/src/**</code></li><li><code>apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro}</code></li><li><code>apps/desktop/plugins/saf-save/{Cargo.toml,build.rs}</code></li><li><code>apps/desktop/plugins/saf-save/permissions/default.toml</code></li></ul></details>
-    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>save-pdf.test.ts</code></li><li><span class="tag u">unit</span><code>generation.test.tsx</code></li><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li><li><span class="tag n">rust</span><code>apps/desktop/plugins/saf-save/Cargo.toml</code></li></ul></div>
+    <details><summary>Arquivos (10)</summary><ul class="arquivos"><li><code>apps/web/src/lib/generation.ts</code></li><li><code>apps/web/src/lib/save-pdf.ts</code></li><li><code>apps/web/src/components/workspace/generation-action.tsx</code></li><li><code>apps/web/src/workspace/long-operation.ts</code></li><li><code>apps/web/src/components/workspace/long-operation-notice.tsx</code></li><li><code>apps/desktop/plugins/saf-save/src/**</code></li><li><code>apps/desktop/plugins/saf-save/android/src/**</code></li><li><code>apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro}</code></li><li><code>apps/desktop/plugins/saf-save/{Cargo.toml,build.rs}</code></li><li><code>apps/desktop/plugins/saf-save/permissions/default.toml</code></li></ul></details>
+    <div class="bloco"><span class="rotulo">Testes</span><ul class="testes"><li><span class="tag u">unit</span><code>save-pdf.test.ts</code></li><li><span class="tag u">unit</span><code>generation.test.tsx</code></li><li><span class="tag u">unit</span><code>long-operation.test.tsx</code></li><li><span class="tag e">e2e</span><code>workspace.spec.ts</code></li><li><span class="tag n">rust</span><code>apps/desktop/plugins/saf-save/Cargo.toml</code></li></ul></div>
     <div class="bloco manual"><span class="rotulo">Verificacao manual</span><ul><li>verify:desktop -&gt; ARQUIVO (seletor Salvar como)</li><li>verify:android -&gt; UNIR SELETOR/ARQUIVO/INTEGRO (gravacao pelo SAF)</li></ul></div>
   </article>
   <article class="cartao" id="C-SERVICOS" data-busca="c-servicos workers da sessao e liberacao de memoria cria os workers uma vez por sessao e solta as paginas da renderizacao durante operacoes pesadas. apps/web/src/workspace/services.tsx rnf-03">

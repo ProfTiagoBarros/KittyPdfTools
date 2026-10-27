@@ -51,12 +51,7 @@ describe('usePageSpec', () => {
     act(() => result.current.setSpec('5-8'));
 
     expect(result.current.indices).toEqual([4, 5, 6, 7]);
-    expect(sessionStore.getState().selection).toEqual([
-      chave(4),
-      chave(5),
-      chave(6),
-      chave(7),
-    ]);
+    expect(sessionStore.getState().selection).toEqual([chave(4), chave(5), chave(6), chave(7)]);
   });
 
   it('preserva o texto digitado, sem reformatar embaixo do cursor', () => {

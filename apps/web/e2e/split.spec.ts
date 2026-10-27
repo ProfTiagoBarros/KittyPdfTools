@@ -105,17 +105,14 @@ test('varios arquivos arrastados de uma vez: abre o primeiro e diz isso', async 
     ['a.pdf', minimalPdf(3)],
     ['b.pdf', minimalPdf(2)],
   ];
-  const arrastados = await page.evaluateHandle(
-    (lista) => {
-      const transferencia = new DataTransfer();
-      for (const [nome, conteudo] of lista) {
-        const bytes = Uint8Array.from(conteudo, (c) => c.charCodeAt(0));
-        transferencia.items.add(new File([bytes], nome, { type: 'application/pdf' }));
-      }
-      return transferencia;
-    },
-    arquivos,
-  );
+  const arrastados = await page.evaluateHandle((lista) => {
+    const transferencia = new DataTransfer();
+    for (const [nome, conteudo] of lista) {
+      const bytes = Uint8Array.from(conteudo, (c) => c.charCodeAt(0));
+      transferencia.items.add(new File([bytes], nome, { type: 'application/pdf' }));
+    }
+    return transferencia;
+  }, arquivos);
   await page.getByTestId('dropzone').dispatchEvent('drop', { dataTransfer: arrastados });
 
   await expect(cards(page)).toHaveCount(3);

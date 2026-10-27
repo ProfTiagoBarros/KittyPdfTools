@@ -228,9 +228,15 @@ trocar: a tela foi desenhada em volta de **uma** montagem com as ferramentas na 
 **Dois espaços de trabalho, um par de workers.** O store é criado por fábrica
 (`createWorkspaceStore`) e lido do **contexto** (`useWorkspaceStore(selector)`): a sessão
 (`sessionStore`) é o padrão e o Dividir troca pelo seu (`WorkspaceStoreProvider`). Nenhum
-componente sabe qual é. Os workers são compartilhados — por isso a liberação de memória reabre
-os documentos dos **dois** (`openDocumentIds`): reabrir só os do espaço atual deixaria a grade do
-outro esperando para sempre. Há E2E que divide e volta ao Unir conferindo as miniaturas.
+componente sabe qual é. Os workers são compartilhados: liberar a memória solta os documentos dos
+dois espaços, e cada um volta do **arquivo** quando a grade dele pedir. Há E2E que divide e volta
+ao Unir conferindo as miniaturas.
+
+**Aviso de operação demorada** (`LongOperationNotice`): abrir arquivos, gerar e a primeira busca
+contam num contador global (`beginLongOperation`); depois de **1 s** um painel cobre a tela com
+"O programa está realizando uma operação demorada…", progresso quando houver, e bloqueia cliques.
+Quem espera o segundo é o **CSS** (`animation-delay` + `visibility: hidden`), sem timer: operação
+rápida não pisca a tela. Nasceu de unir 816 páginas com a tela parada, parecendo travada.
 
 **Lupa em toda página** (`PagePreview`, US-08). A miniatura da grade não responde "que página é
 esta?" — o administrador da escola ordenava um documento longo, gerava o PDF, conferia e voltava
@@ -326,25 +332,43 @@ activities` continua listando o `documentsui` na pilha, e o relatório acusava s
   vez de esperar o aviso da tarefa.
 
 **Memória** — orçamento: Windows 32 bits dá **~2 GB por processo**, e a tela e os workers
-dividem o mesmo processo. Medido com dois PDFs escaneados de 200 páginas (287 MB): juntar foi de
-1.547 para 969 MB vivos; a segunda junção, de 1.835 para 969.
+dividem o mesmo processo. **Nenhum byte de documento fica parado na memória**: o que se guarda é
+o `File` do seletor (aponta para o disco, atravessa a fronteira por referência), e cada worker
+lê só o que precisa, quando precisa. Medido com oito PDFs escaneados (816 páginas, 551 MB — o
+lote que deixou a tela do app **preta** no 64 bits): abertos, de 1.173 para **290 MB vivos**;
+unindo, o renderizador de 3.055 para **815 MB**. Dobrando a entrada, o pico sobe ~300 MB, não o
+dobro. Régua e fixtures sintéticas em `tools/` — nunca meça com `documentos/`.
 
 - **`page.cleanup()` depois de todo desenho e extração de texto.** Sem isso o pdf.js guarda a
   imagem decodificada de cada página (~8 MB numa escaneada): rolar a grade somava 1 GB.
-- `pdfjsDocumentOptions` **copia** os bytes por padrão (`new Uint8Array(pdf)`). O worker de
-  renderização abre com `adopt: true` e **não guarda cópia própria**; ofuscar e OCR pedem
-  `renderer.getData()` na hora.
-- `buildComposition` carrega **uma origem por vez** e a solta após copiar: o pdf-lib copia o
-  conteúdo dos streams ao interpretar e de novo ao copiar páginas.
-- Operação pesada passa `around: usePageMemoryRelease()` à geração: o worker de renderização
-  solta os documentos depois de escolhido o destino e os reabre **depois de gravar**. Pedidos
-  de miniatura nesse intervalo **esperam**, não falham.
+- **Renderização lê por faixas** (`openForRendering(blob)` → `PDFDataRangeTransport` sobre
+  `Blob.slice`): contar páginas lê o fim do arquivo e o catálogo; uma miniatura, a página e a
+  imagem dela. Ler o arquivo inteiro para contar páginas fazia 1,1 GB de lixo ao abrir 16
+  arquivos. Documentos abertos no pdf.js num **LRU de 192 MB** (`OPEN_BUDGET_BYTES`); o que está
+  em uso (`withDocument`) nunca é solto no meio de um desenho.
+- **Compor grava em fluxo** (`writeComposition` + `StreamingPdfWriter`): uma origem por vez,
+  grava os objetos que ela trouxe e os solta do contexto (`context.delete`) antes da próxima;
+  páginas, árvore e catálogo por último, xref ordenada no fim. O `save()` do pdf-lib alocava o
+  arquivo inteiro com o documento ainda vivo — duas cópias do resultado. Unir e extrair devolvem
+  `Blob` (montado em pedaços de 16 MB), que mora fora do processo da tela. `buildComposition`
+  (Dividir, Compactar, Assinar) é o mesmo gravador juntando os pedaços.
+- **Gravar em pedaços de 8 MB** (`write_chunk` + `finish_write`): o arquivo inteiro numa
+  requisição era uma cópia do documento dentro da ponte, e no Android (JSON, ~3,6×) nem cabia.
+  No desktop o temporário fica **ao lado** do destino e um `rename` o põe no lugar — falha no
+  meio não estraga o arquivo que o usuário escolheu sobrescrever. No Android, temporário no
+  cache e `copyToUri` no fim.
+- Operação pesada passa `around: usePageMemoryRelease()` à geração: a renderização solta os
+  documentos depois de escolhido o destino e **não reabre nada** depois (`resume`) — cada um
+  volta do arquivo quando a grade pedir. Pedidos nesse intervalo **esperam**, não falham.
 - **"Salvar de novo" nunca guarda bytes**: copia o arquivo já gravado (`copy_saved`). Origem
   igual ao destino é no-op — abrir em `"wt"` zeraria a origem antes de lê-la.
-- **Régua:** memória privada do processo, numa máquina 64 bits com RAM sobrando, mistura lixo
-  não coletado (o mesmo código deu 1.568 e 1.847 MB). Use
+- **Régua** (`tools/regua-memoria.mjs`): memória privada do processo, numa máquina 64 bits com
+  RAM sobrando, mistura lixo não coletado (o mesmo código deu 1.568 e 1.847 MB). Use também
   `performance.measureUserAgentSpecificMemory()`: exige COOP+COEP e o Chromium completo
-  (`channel: 'chromium'`) — o headless-shell padrão do Playwright não a tem.
+  (`channel: 'chromium'`) — o headless-shell padrão do Playwright não a tem — e **durante
+  operação pesada a amostra só volta quando o worker fica ocioso** (retrata o fim, não o pico).
+  O teste que separa vivo de lixo é **dobrar a entrada**: se o vivo fica plano, o que cresce é
+  lixo. E meça o processo **renderizador** (`--type=renderer`), que é o que cai.
 
 **Código**
 

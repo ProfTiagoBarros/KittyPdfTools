@@ -5,17 +5,18 @@ import type { CancelRequest, CancelledMessage, ErrorMessage, ProgressMessage } f
 /**
  * Protocolo do worker de documentos (US-01 e US-02).
  *
- * O worker e residente e DONO DOS BYTES: a UI envia cada PDF uma unica vez, por `load`, e
- * depois trafega apenas identificadores, composicoes e comandos. Isso evita retransferir
- * dezenas de megabytes a cada exportacao e mantem a main thread sem copia dos documentos.
+ * O worker e residente e guarda o ARQUIVO de cada documento — o `File` do seletor, que aponta
+ * para o disco —, e nao os bytes. Le a origem so quando uma operacao precisa dela, uma de cada
+ * vez. Guardar os bytes custava o tamanho inteiro de cada arquivo aberto: oito PDFs escaneados
+ * de 70 a 95 MB eram 551 MB parados aqui, e outros tantos no worker de renderizacao.
  */
 
 export interface LoadRequest {
   readonly kind: 'load';
   readonly id: string;
   readonly documentId: string;
-  /** Transferido por transfer list: o buffer do lado da UI e destacado de proposito. */
-  readonly bytes: ArrayBuffer;
+  /** Clonado por referencia: um `Blob` atravessa a fronteira sem copiar o conteudo. */
+  readonly file: Blob;
 }
 
 export interface UnloadRequest {
@@ -56,9 +57,20 @@ export interface SplitBySizeRequest {
  * usuario precisa saber qual antes de executar.
  */
 export type SplitMode =
-  | { readonly kind: 'extract'; readonly spec: string }
   | { readonly kind: 'ranges'; readonly spec: string }
   | { readonly kind: 'size'; readonly maxBytes: number };
+
+/**
+ * Recorta da composicao as paginas do intervalo (base 1, numeracao da grade) para UM PDF.
+ *
+ * Seleciona antes de montar: montar as 816 paginas para guardar cinco era o caminho antigo.
+ */
+export interface ExtractCompositionRequest {
+  readonly kind: 'extractComposition';
+  readonly id: string;
+  readonly composition: readonly PageRef[];
+  readonly spec: string;
+}
 
 /**
  * Divide a COMPOSICAO, nao um arquivo de origem.
@@ -80,33 +92,15 @@ export type DocumentRequest =
   | ExtractRequest
   | SplitByRangesRequest
   | SplitBySizeRequest
+  | ExtractCompositionRequest
   | SplitCompositionRequest
-  | CopyRequest
   | CancelRequest;
 
-/**
- * Pede uma copia dos bytes de um documento.
- *
- * Este worker e o dono dos bytes; o de renderizacao solta a dele durante as operacoes pesadas
- * e, ao final, reabre a partir daqui. A copia e transferida, nao duplicada no caminho.
- */
-export interface CopyRequest {
-  readonly kind: 'copy';
-  readonly id: string;
-  readonly documentId: string;
-}
-
-export interface CopiedMessage {
-  readonly kind: 'copied';
-  readonly id: string;
-  readonly bytes: ArrayBuffer;
-}
-
+/** Arquivo registrado. Sem contagem de paginas: quem a sabe e o worker de renderizacao. */
 export interface LoadedMessage {
   readonly kind: 'loaded';
   readonly id: string;
   readonly documentId: string;
-  readonly pageCount: number;
 }
 
 export interface UnloadedMessage {
@@ -118,6 +112,19 @@ export interface BuiltMessage {
   readonly kind: 'built';
   readonly id: string;
   readonly pdf: ArrayBuffer;
+}
+
+/**
+ * Documento montado em fluxo, entregue como `Blob`.
+ *
+ * O conteudo de um `Blob` mora fora do processo da pagina (o navegador o guarda, e pode leva-lo
+ * ao disco), e atravessa fronteiras por referencia. E o que permite entregar 551 MB sem que o
+ * processo que desenha a tela os tenha inteiros em momento algum.
+ */
+export interface ComposedMessage {
+  readonly kind: 'composed';
+  readonly id: string;
+  readonly pdf: Blob;
 }
 
 export interface VolumesMessage {
@@ -132,7 +139,7 @@ export type DocumentResponse =
   | LoadedMessage
   | UnloadedMessage
   | BuiltMessage
-  | CopiedMessage
+  | ComposedMessage
   | VolumesMessage
   | ProgressMessage
   | CancelledMessage
@@ -142,7 +149,7 @@ const RESPONSE_KINDS = new Set([
   'loaded',
   'unloaded',
   'built',
-  'copied',
+  'composed',
   'volumes',
   'progress',
   'cancelled',

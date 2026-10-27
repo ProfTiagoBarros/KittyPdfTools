@@ -14,8 +14,11 @@ export interface OpenRequest {
   readonly kind: 'open';
   readonly id: string;
   readonly documentId: string;
-  /** Transferido por transfer list: os bytes passam a pertencer ao worker. */
-  readonly bytes: ArrayBuffer;
+  /**
+   * O arquivo, e nao os bytes: clonado por referencia, sem copiar o conteudo. O worker le e
+   * abre no pdf.js so quando precisa desenhar, e solta quando passa do orcamento.
+   */
+  readonly file: Blob;
 }
 
 export interface CloseRequest {
@@ -66,7 +69,7 @@ export interface CompressRequest {
 }
 
 /**
- * Solta todos os documentos abertos no pdf.js, ate a tela reabri-los.
+ * Solta todos os documentos abertos no pdf.js; eles se reabrem do arquivo quando forem pedidos.
  *
  * Existe para as operacoes pesadas — juntar, dividir, extrair, compactar. Elas acontecem no
  * worker de documentos, mas dividem o MESMO processo com este worker: num Windows 32 bits o

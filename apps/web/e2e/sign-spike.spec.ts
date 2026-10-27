@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { leavesTheDevice } from './rede';
 
 /**
  * Spike de viabilidade de US-05.
@@ -45,9 +46,7 @@ test.describe('viabilidade da assinatura no navegador', () => {
     // documento ficam na maquina, e este spike nao usa carimbo de tempo.
     const externalRequests: string[] = [];
     page.on('request', (request) => {
-      const { hostname } = new URL(request.url());
-      if (hostname !== '127.0.0.1' && hostname !== 'localhost')
-        externalRequests.push(request.url());
+      if (leavesTheDevice(request.url())) externalRequests.push(request.url());
     });
 
     await page.goto('/spike/assinar/');

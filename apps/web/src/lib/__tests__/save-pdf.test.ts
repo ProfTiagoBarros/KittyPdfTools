@@ -10,6 +10,17 @@ vi.mock('@tauri-apps/api/core', () => ({
 }));
 
 const BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+const ARQUIVO = new Blob([BYTES], { type: 'application/pdf' });
+
+/** O que cada chamada de gravacao levou: corpo e cabecalhos, na ordem. */
+function pedacosGravados() {
+  return invoke.mock.calls
+    .filter(([cmd]) => cmd === 'plugin:saf-save|write_chunk')
+    .map(([, corpo, opcoes]) => ({
+      tamanho: (corpo as Uint8Array).length,
+      append: (opcoes as { headers: { append: string } }).headers.append,
+    }));
+}
 
 const createObjectURL = vi.fn<(objeto: Blob) => string>();
 const revokeObjectURL = vi.fn<(url: string) => void>();
@@ -42,7 +53,7 @@ describe('savePdf', () => {
         .spyOn(HTMLAnchorElement.prototype, 'click')
         .mockImplementation(() => undefined);
 
-      await savePdf(BYTES, 'saida.pdf');
+      await savePdf(ARQUIVO, 'saida.pdf');
 
       expect(createObjectURL).toHaveBeenCalledOnce();
       expect(click).toHaveBeenCalledOnce();
@@ -60,21 +71,52 @@ describe('savePdf', () => {
     it('pergunta onde salvar e grava no caminho escolhido', async () => {
       save.mockResolvedValue('/escolhido/saida.pdf');
 
-      await savePdf(BYTES, 'saida.pdf');
+      await savePdf(ARQUIVO, 'saida.pdf');
 
       expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: 'saida.pdf' }));
       // O destino viaja no cabecalho e os bytes como corpo binario — nunca em JSON.
-      expect(invoke).toHaveBeenCalledWith('plugin:saf-save|save_to_uri', BYTES, {
-        headers: { destination: '/escolhido/saida.pdf' },
+      expect(invoke).toHaveBeenCalledWith('plugin:saf-save|write_chunk', BYTES, {
+        headers: { destination: '/escolhido/saida.pdf', append: '0' },
       });
+      // So no fim o destino recebe o arquivo: uma falha no meio nao estraga o que ja existia.
+      expect(invoke.mock.lastCall?.slice(0, 2)).toEqual([
+        'plugin:saf-save|finish_write',
+        { destination: '/escolhido/saida.pdf' },
+      ]);
       // O caminho da web nao pode acontecer junto: no WebView do Android ele nao salva nada.
       expect(createObjectURL).not.toHaveBeenCalled();
+    });
+
+    it('arquivo grande vai em pedacos de 8 MB: o primeiro zera, os demais acrescentam', async () => {
+      save.mockResolvedValue('/escolhido/grande.pdf');
+      const oitoMb = 8 * 1024 * 1024;
+      const grande = new Blob([new Uint8Array(oitoMb * 2 + 10)]);
+
+      await savePdf(grande, 'grande.pdf');
+
+      expect(pedacosGravados()).toEqual([
+        { tamanho: oitoMb, append: '0' },
+        { tamanho: oitoMb, append: '1' },
+        { tamanho: 10, append: '1' },
+      ]);
+      expect(invoke.mock.lastCall?.slice(0, 2)).toEqual([
+        'plugin:saf-save|finish_write',
+        { destination: '/escolhido/grande.pdf' },
+      ]);
+    });
+
+    it('falha num pedaco nao conclui a gravacao', async () => {
+      save.mockResolvedValue('/escolhido/saida.pdf');
+      invoke.mockRejectedValueOnce(new Error('disco cheio'));
+
+      await expect(savePdf(ARQUIVO, 'saida.pdf')).rejects.toThrow('disco cheio');
+      expect(invoke).not.toHaveBeenCalledWith('plugin:saf-save|finish_write', expect.anything());
     });
 
     it('nao grava nada quando o usuario cancela o seletor', async () => {
       save.mockResolvedValue(null);
 
-      await savePdf(BYTES, 'saida.pdf');
+      await savePdf(ARQUIVO, 'saida.pdf');
 
       expect(invoke).not.toHaveBeenCalled();
     });
@@ -83,7 +125,7 @@ describe('savePdf', () => {
       save.mockResolvedValue('/escolhido/saida.pdf');
       invoke.mockRejectedValue(new Error('disco cheio'));
 
-      await expect(savePdf(BYTES, 'saida.pdf')).rejects.toThrow('disco cheio');
+      await expect(savePdf(ARQUIVO, 'saida.pdf')).rejects.toThrow('disco cheio');
     });
   });
 });

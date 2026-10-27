@@ -142,13 +142,11 @@ function CompressProvider({ children }: { children: ReactNode }) {
          * quem tem canvas.
          */
         const montado = await services.documents.compose(toPageRefs(items));
-        const original = montado.length;
+        const original = montado.size;
 
-        const resultado = await services.render.compress(
-          montado.buffer as ArrayBuffer,
-          selecionado,
-          { onProgress: (feito, total) => report(feito / total) },
-        );
+        const resultado = await services.render.compress(await montado.arrayBuffer(), selecionado, {
+          onProgress: (feito, total) => report(feito / total),
+        });
 
         setOutcome({
           originalBytes: original,

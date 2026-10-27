@@ -1,6 +1,7 @@
 import { inflateSync } from 'node:zlib';
 import forge from 'node-forge';
 import { test, expect, type Page } from '@playwright/test';
+import { leavesTheDevice } from './rede';
 
 /**
  * Exercita US-05 pela interface.
@@ -246,8 +247,7 @@ test.describe('assinatura', () => {
   test('assinar nao faz nenhuma requisicao de rede (AD-RB)', async ({ page }) => {
     const external: string[] = [];
     page.on('request', (request) => {
-      const { hostname } = new URL(request.url());
-      if (hostname !== '127.0.0.1' && hostname !== 'localhost') external.push(request.url());
+      if (leavesTheDevice(request.url())) external.push(request.url());
     });
 
     await attachPdf(page);

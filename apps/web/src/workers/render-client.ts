@@ -65,7 +65,8 @@ export interface OcrResult {
 }
 
 export interface RenderWorkspace {
-  open(documentId: string, bytes: ArrayBuffer): Promise<number>;
+  /** Registra o arquivo e devolve quantas paginas ele tem. Recusa o que nao for PDF. */
+  open(documentId: string, file: Blob): Promise<number>;
   close(documentId: string): Promise<void>;
   /**
    * Imagem da pagina. Repetir a chamada devolve a mesma, sem re-renderizar.
@@ -100,7 +101,7 @@ export interface RenderWorkspace {
    */
   pageTexts(documentId: string): Promise<readonly string[]>;
   /**
-   * Solta os documentos do pdf.js ate `restore`.
+   * Solta os documentos do pdf.js ate `resume`.
    *
    * As miniaturas ja desenhadas FICAM no cache: sao bitmaps pequenos e independentes do
    * documento, e descarta-las faria a grade piscar sem ganho de memoria que valha.
@@ -111,15 +112,10 @@ export interface RenderWorkspace {
    */
   release(): Promise<void>;
   /**
-   * Reabre os documentos, um de cada vez, e libera quem estava esperando.
-   *
-   * Um de cada vez de proposito: buscar todas as copias antes de abrir somaria todos os
-   * arquivos de uma vez na memoria, logo depois do pico que a liberacao queria evitar.
+   * Libera quem estava esperando. Nao reabre nada: cada documento volta do arquivo quando a
+   * proxima miniatura, busca ou ofuscacao pedir por ele — e so os que forem pedidos.
    */
-  restore(
-    documentIds: readonly string[],
-    loadBytes: (documentId: string) => Promise<ArrayBuffer>,
-  ): Promise<void>;
+  resume(): void;
   /** Numero de miniaturas vivas no cache. Existe para os testes observarem o descarte. */
   cachedThumbnails(): number;
   dispose(): void;
@@ -200,13 +196,13 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
 
   /** Pendente enquanto os documentos estao liberados; `null` quando estao abertos. */
   let paused: Promise<void> | null = null;
-  let resume: (() => void) | undefined;
+  let retomar: (() => void) | undefined;
   const whenOpen = () => paused ?? Promise.resolve();
 
   return {
-    async open(documentId, bytes) {
+    async open(documentId, file) {
       dropDocument(documentId);
-      return send({ kind: 'open', id: newId(), documentId, bytes }, [bytes], (message) =>
+      return send({ kind: 'open', id: newId(), documentId, file }, [], (message) =>
         message.kind === 'opened' ? message.pageCount : undefined,
       );
     },
@@ -350,7 +346,7 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
     async release() {
       if (paused !== null) return;
       paused = new Promise<void>((resolve) => {
-        resume = resolve;
+        retomar = resolve;
       });
 
       // Deixa terminar o que ja foi enviado: uma miniatura em voo para um documento que acabou
@@ -362,26 +358,11 @@ export function createRenderWorkspace(options: RenderWorkspaceOptions = {}): Ren
       );
     },
 
-    async restore(documentIds, loadBytes) {
-      try {
-        for (const documentId of documentIds) {
-          try {
-            const bytes = await loadBytes(documentId);
-            // Sem `dropDocument`: as miniaturas em cache continuam validas.
-            await send({ kind: 'open', id: newId(), documentId, bytes }, [bytes], (message) =>
-              message.kind === 'opened' ? true : undefined,
-            );
-          } catch (cause) {
-            // Um documento que nao reabre nao pode prender os outros nem a tela inteira.
-            console.error('Falha ao reabrir o documento apos a operacao', { documentId }, cause);
-          }
-        }
-      } finally {
-        const liberar = resume;
-        paused = null;
-        resume = undefined;
-        liberar?.();
-      }
+    resume() {
+      const liberar = retomar;
+      paused = null;
+      retomar = undefined;
+      liberar?.();
     },
 
     cachedThumbnails: () => cache.size,

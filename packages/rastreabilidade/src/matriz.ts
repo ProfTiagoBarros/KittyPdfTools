@@ -119,10 +119,11 @@ const componentes: readonly Componente[] = [
   {
     id: 'C-COMPOSICAO',
     nome: 'Composicao de paginas (pdf-lib)',
-    descricao: 'Materializa a lista de paginas num PDF, carregando uma origem por vez.',
+    descricao:
+      'Materializa a lista de paginas num PDF em fluxo: uma origem por vez, gravando e soltando o conteudo antes da proxima.',
     arquivos: [`${CORE}/composition/**`],
     usa: ['C-NUCLEO'],
-    testes: testes([`${CORE}/composition/build.test.ts`]),
+    testes: testes([`${CORE}/composition/build.test.ts`, `${CORE}/composition/writer.test.ts`]),
     requisitos: ['RNF-03'],
     verificacaoManual: [],
   },
@@ -216,11 +217,13 @@ const componentes: readonly Componente[] = [
     id: 'C-GERACAO',
     nome: 'Fluxo de geracao e gravacao',
     descricao:
-      'Destino antes de gerar, progresso, ultima geracao, gravacao pelo plugin proprio (Rust + Kotlin) e copia do arquivo ja salvo.',
+      'Destino antes de gerar, progresso, aviso de operacao demorada, ultima geracao, gravacao em pedacos pelo plugin proprio (Rust + Kotlin) e copia do arquivo ja salvo.',
     arquivos: [
       `${WEB}/lib/generation.ts`,
       `${WEB}/lib/save-pdf.ts`,
       `${WEB}/components/workspace/generation-action.tsx`,
+      `${WEB}/workspace/long-operation.ts`,
+      `${WEB}/components/workspace/long-operation-notice.tsx`,
       `${PLUGIN}/src/**`,
       `${PLUGIN}/android/src/**`,
       `${PLUGIN}/android/{build.gradle.kts,settings.gradle,consumer-rules.pro}`,
@@ -229,7 +232,11 @@ const componentes: readonly Componente[] = [
     ],
     usa: ['C-I18N', 'C-NUCLEO'],
     testes: testes(
-      [`${WEB}/lib/__tests__/save-pdf.test.ts`, `${WEB}/lib/__tests__/generation.test.tsx`],
+      [
+        `${WEB}/lib/__tests__/save-pdf.test.ts`,
+        `${WEB}/lib/__tests__/generation.test.tsx`,
+        `${WEB}/workspace/__tests__/long-operation.test.tsx`,
+      ],
       ['workspace.spec.ts'],
       [`${PLUGIN}/Cargo.toml`],
     ),
@@ -556,7 +563,7 @@ export const matriz: Matriz = {
     'apps/web/next.config.ts',
     'apps/web/next-env.d.ts',
     'apps/web/postcss.config.mjs',
-    `${E2E}/{capabilities.ts,minimal-pdf.ts}`,
+    `${E2E}/{capabilities.ts,minimal-pdf.ts,rede.ts}`,
     `${CORE}/testing/**`,
   ],
 

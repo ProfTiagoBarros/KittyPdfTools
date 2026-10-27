@@ -4,17 +4,17 @@ import type { Destination } from '../save-pdf';
 import { useGeneration, type GenerationAround } from '../generation';
 
 const chooseDestination = vi.fn<(name: string) => Promise<Destination | null>>();
-const writeTo = vi.fn<(destination: Destination, bytes: Uint8Array) => Promise<void>>();
+const writeTo = vi.fn<(destination: Destination, content: Blob) => Promise<void>>();
 const discardDestination = vi.fn<(destination: Destination) => Promise<void>>();
 const copySaved = vi.fn<(source: string, destination: Destination) => Promise<void>>();
-const savePdf = vi.fn<(bytes: Uint8Array, name: string) => Promise<void>>();
+const savePdf = vi.fn<(content: Blob, name: string) => Promise<void>>();
 
 vi.mock('../save-pdf', () => ({
   chooseDestination: (name: string) => chooseDestination(name),
-  writeTo: (destination: Destination, bytes: Uint8Array) => writeTo(destination, bytes),
+  writeTo: (destination: Destination, content: Blob) => writeTo(destination, content),
   discardDestination: (destination: Destination) => discardDestination(destination),
   copySaved: (source: string, destination: Destination) => copySaved(source, destination),
-  savePdf: (bytes: Uint8Array, name: string) => savePdf(bytes, name),
+  savePdf: (content: Blob, name: string) => savePdf(content, name),
 }));
 
 const BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
@@ -24,10 +24,12 @@ const NO_NAVEGADOR: Destination = { kind: 'browser', fileName: 'contrato.pdf' };
 /** Registra a ordem em que as etapas do fluxo acontecem. */
 function registrar() {
   const ordem: string[] = [];
-  const etapa = <T,>(nome: string, valor: T) => () => {
-    ordem.push(nome);
-    return Promise.resolve(valor);
-  };
+  const etapa =
+    <T,>(nome: string, valor: T) =>
+    () => {
+      ordem.push(nome);
+      return Promise.resolve(valor);
+    };
   chooseDestination.mockImplementation(etapa('destino', NO_DISCO));
   writeTo.mockImplementation(etapa('gravar', undefined));
   const around: GenerationAround = {
@@ -98,7 +100,10 @@ describe('useGeneration', () => {
   it('falha ao liberar memoria nao impede a geracao', async () => {
     const { produce } = registrar();
     const after = vi.fn(() => Promise.resolve());
-    const around: GenerationAround = { before: () => Promise.reject(new Error('sem memoria')), after };
+    const around: GenerationAround = {
+      before: () => Promise.reject(new Error('sem memoria')),
+      after,
+    };
     const { result } = renderHook(() => useGeneration());
 
     act(() => result.current.run({ suggestedName: 'contrato.pdf', produce, around }));
@@ -106,6 +111,19 @@ describe('useGeneration', () => {
     await waitFor(() => expect(result.current.last).not.toBeNull());
     // Nada foi liberado, entao nada ha para restaurar.
     expect(after).not.toHaveBeenCalled();
+  });
+
+  it('quem entrega um Blob (montado em fluxo) grava o proprio Blob, sem copiar', async () => {
+    const { produce: _ignorado } = registrar();
+    const montado = new Blob([BYTES], { type: 'application/pdf' });
+    const { result } = renderHook(() => useGeneration());
+
+    act(() =>
+      result.current.run({ suggestedName: 'x.pdf', produce: () => Promise.resolve(montado) }),
+    );
+
+    await waitFor(() => expect(result.current.last).not.toBeNull());
+    expect(writeTo.mock.calls[0]?.[1]).toBe(montado);
   });
 
   it('no app instalado, lembra o CAMINHO gravado e nao os bytes', async () => {
@@ -124,13 +142,19 @@ describe('useGeneration', () => {
   it('na web, guarda os bytes de arquivo pequeno e esquece os de arquivo grande', async () => {
     chooseDestination.mockResolvedValue(NO_NAVEGADOR);
     const pequeno = renderHook(() => useGeneration());
-    act(() => pequeno.result.current.run({ suggestedName: 'a.pdf', produce: () => Promise.resolve(BYTES) }));
+    act(() =>
+      pequeno.result.current.run({ suggestedName: 'a.pdf', produce: () => Promise.resolve(BYTES) }),
+    );
     await waitFor(() => expect(pequeno.result.current.last).not.toBeNull());
-    expect(pequeno.result.current.last?.source).toEqual({ kind: 'memory', bytes: BYTES });
+    const guardado = pequeno.result.current.last?.source;
+    expect(guardado?.kind).toBe('memory');
+    expect(guardado?.kind === 'memory' ? guardado.content.size : -1).toBe(BYTES.length);
 
     const enorme = new Uint8Array(50 * 1024 * 1024 + 1);
     const grande = renderHook(() => useGeneration());
-    act(() => grande.result.current.run({ suggestedName: 'b.pdf', produce: () => Promise.resolve(enorme) }));
+    act(() =>
+      grande.result.current.run({ suggestedName: 'b.pdf', produce: () => Promise.resolve(enorme) }),
+    );
     await waitFor(() => expect(grande.result.current.last).not.toBeNull());
     expect(grande.result.current.last?.source).toBeNull();
   });
@@ -165,12 +189,15 @@ describe('useGeneration', () => {
   it('salvar de novo na web entrega os bytes guardados', async () => {
     chooseDestination.mockResolvedValue(NO_NAVEGADOR);
     const { result } = renderHook(() => useGeneration());
-    act(() => result.current.run({ suggestedName: 'a.pdf', produce: () => Promise.resolve(BYTES) }));
+    act(() =>
+      result.current.run({ suggestedName: 'a.pdf', produce: () => Promise.resolve(BYTES) }),
+    );
     await waitFor(() => expect(result.current.last).not.toBeNull());
 
     act(() => result.current.saveAgain());
 
-    await waitFor(() => expect(savePdf).toHaveBeenCalledWith(BYTES, 'contrato.pdf'));
+    await waitFor(() => expect(savePdf).toHaveBeenCalledWith(expect.any(Blob), 'contrato.pdf'));
+    expect(savePdf.mock.calls[0]?.[0].size).toBe(BYTES.length);
     expect(copySaved).not.toHaveBeenCalled();
   });
 });

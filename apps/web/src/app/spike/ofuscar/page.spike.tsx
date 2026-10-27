@@ -71,9 +71,8 @@ export default function SpikePage() {
         const originalTextHasSecret = (await extractAllText(original)).includes(SECRET);
         const originalBytesHaveSecret = await existsInFileBytes(original, SECRET);
 
-        // A transfer list destaca o buffer enviado ao worker; manda-se uma copia.
-        const copy = original.slice();
-        await workspace.open('doc', copy.buffer);
+        // O worker recebe o arquivo, nao os bytes: abre e solta sob demanda.
+        await workspace.open('doc', new Blob([original.slice()]));
 
         // Miniaturas: mesmo documento aberto, sem reabrir o PDF por pagina.
         const thumbnail = await workspace.thumbnail('doc', 0);
@@ -84,7 +83,7 @@ export default function SpikePage() {
         const multi = await createTextPdf(
           Array.from({ length: 4 }, (_unused, index) => [{ text: `P${index}`, y: 150 }]),
         );
-        await workspace.open('multi', multi.slice().buffer);
+        await workspace.open('multi', new Blob([multi.slice()]));
         for (let page = 0; page < 4; page += 1) await workspace.thumbnail('multi', page);
         const cacheEvicts = workspace.cachedThumbnails() === 2;
 

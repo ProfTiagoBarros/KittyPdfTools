@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useWorkspaceServices } from '@/workspace/services';
 import { useWorkspaceStore } from '@/workspace/store';
 import { findMatches, matchesInGrid, stepMatch } from '@/workspace/search';
+import { beginLongOperation } from '@/workspace/long-operation';
 
 /** Espera o usuario parar de digitar: buscar a cada tecla piscaria a grade inteira. */
 const DEBOUNCE_MS = 250;
@@ -45,8 +46,11 @@ export function SearchField() {
     }
 
     let cancelled = false;
+    let endLongOperation: (() => void) | undefined;
     const timer = setTimeout(() => {
       setBusy(true);
+      // A primeira busca extrai o texto de todas as paginas: em centenas delas, demora.
+      endLongOperation = beginLongOperation();
 
       void Promise.all(
         documents.map(
@@ -64,6 +68,7 @@ export function SearchField() {
           if (!cancelled) setSearch(term, { matchedPages: [], occurrences: {}, pagesWithText: 0 });
         })
         .finally(() => {
+          endLongOperation?.();
           if (!cancelled) setBusy(false);
         });
     }, DEBOUNCE_MS);
@@ -71,6 +76,7 @@ export function SearchField() {
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      endLongOperation?.();
     };
   }, [services, documents, term, setSearch]);
 

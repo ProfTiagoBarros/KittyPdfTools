@@ -89,6 +89,8 @@ export const ptBR = {
 
   'error.loadFailed': 'Nao foi possivel ler {file}. O arquivo pode estar corrompido ou protegido.',
   'save.failed': 'Nao foi possivel salvar o arquivo.',
+  'longOperation.message':
+    'O programa esta realizando uma operacao demorada, aguarde por uns instantes.',
   'generation.copyFailed':
     'Nao encontrei o arquivo salvo. Ele pode ter sido movido ou apagado; gere de novo para outra copia.',
   'generation.tooBigToKeep':

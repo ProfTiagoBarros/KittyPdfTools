@@ -7,6 +7,17 @@ export interface SourceDocument {
 }
 
 /**
+ * Origem lida so quando chega a vez dela.
+ *
+ * E o que deixa unir oito arquivos de 90 MB sem ter os oito na memoria: quem guarda o arquivo
+ * (o `File` do seletor, no disco) entrega os bytes da origem da vez e mais nenhum.
+ */
+export interface LazySource {
+  readonly id: SourceId;
+  readonly load: () => Promise<Uint8Array>;
+}
+
+/**
  * Referencia a uma pagina de origem. Nao contem bytes: o documento final e descrito, nao
  * construido, ate que `buildComposition` seja chamado.
  */

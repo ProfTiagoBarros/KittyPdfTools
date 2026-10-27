@@ -3,7 +3,7 @@
 > Gerado de `packages/rastreabilidade/src/matriz.ts` por `pnpm rastreabilidade`. **Nao edite a mao.**
 > Versao visual: [`rastreabilidade.html`](rastreabilidade.html).
 
-**13** requisitos · **8** funcionalidades · **16** componentes · **25** testes unitarios · **12** specs E2E · **1** suites nativas
+**13** requisitos · **8** funcionalidades · **16** componentes · **27** testes unitarios · **12** specs E2E · **1** suites nativas
 
 ## Como usar
 
@@ -157,13 +157,13 @@ Taxonomia de erros por codigo, a API publica do pdf-core, geometria, cessao do l
 
 ### `C-COMPOSICAO` Composicao de paginas (pdf-lib)
 
-Materializa a lista de paginas num PDF, carregando uma origem por vez.
+Materializa a lista de paginas num PDF em fluxo: uma origem por vez, gravando e soltando o conteudo antes da proxima.
 
 - **Requisitos:** RNF-03
 - **Usa:** `C-NUCLEO`
 - **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `packages/pdf-core/src/composition/**`
-- **Testes:** unitario `build.test.ts`
+- **Testes:** unitario `build.test.ts`, unitario `writer.test.ts`
 
 ### `C-VERIFICACAO` Verificacao de vazamento
 
@@ -225,13 +225,13 @@ Dicionarios, deteccao de idioma e traducao de erros do nucleo.
 
 ### `C-GERACAO` Fluxo de geracao e gravacao
 
-Destino antes de gerar, progresso, ultima geracao, gravacao pelo plugin proprio (Rust + Kotlin) e copia do arquivo ja salvo.
+Destino antes de gerar, progresso, aviso de operacao demorada, ultima geracao, gravacao em pedacos pelo plugin proprio (Rust + Kotlin) e copia do arquivo ja salvo.
 
 - **Requisitos:** RNF-03
 - **Usa:** `C-I18N` `C-NUCLEO`
 - **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
-- **Arquivos:** `apps/web/src/lib/generation.ts`, `apps/web/src/lib/save-pdf.ts`, `apps/web/src/components/workspace/generation-action.tsx`, `apps/desktop/plugins/saf-save/src/**`, `apps/desktop/plugins/saf-save/android/src/**`, `apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro}`, `apps/desktop/plugins/saf-save/{Cargo.toml,build.rs}`, `apps/desktop/plugins/saf-save/permissions/default.toml`
-- **Testes:** unitario `save-pdf.test.ts`, unitario `generation.test.tsx`, E2E `workspace.spec.ts`, nativo `apps/desktop/plugins/saf-save/Cargo.toml`
+- **Arquivos:** `apps/web/src/lib/generation.ts`, `apps/web/src/lib/save-pdf.ts`, `apps/web/src/components/workspace/generation-action.tsx`, `apps/web/src/workspace/long-operation.ts`, `apps/web/src/components/workspace/long-operation-notice.tsx`, `apps/desktop/plugins/saf-save/src/**`, `apps/desktop/plugins/saf-save/android/src/**`, `apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro}`, `apps/desktop/plugins/saf-save/{Cargo.toml,build.rs}`, `apps/desktop/plugins/saf-save/permissions/default.toml`
+- **Testes:** unitario `save-pdf.test.ts`, unitario `generation.test.tsx`, unitario `long-operation.test.tsx`, E2E `workspace.spec.ts`, nativo `apps/desktop/plugins/saf-save/Cargo.toml`
 - **Verificacao manual:** verify:desktop -> ARQUIVO (seletor Salvar como); verify:android -> UNIR SELETOR/ARQUIVO/INTEGRO (gravacao pelo SAF)
 
 ### `C-SERVICOS` Workers da sessao e liberacao de memoria

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { leavesTheDevice } from './rede';
 
 const TOOL_SLUGS = ['unir', 'dividir', 'compactar', 'ocr', 'assinar', 'ofuscar'] as const;
 
@@ -23,10 +24,7 @@ for (const slug of TOOL_SLUGS) {
 test('nenhuma requisicao de rede sai para host externo', async ({ page }) => {
   const externalRequests: string[] = [];
   page.on('request', (request) => {
-    const { hostname } = new URL(request.url());
-    if (hostname !== '127.0.0.1' && hostname !== 'localhost') {
-      externalRequests.push(request.url());
-    }
+    if (leavesTheDevice(request.url())) externalRequests.push(request.url());
   });
 
   await page.goto('/');

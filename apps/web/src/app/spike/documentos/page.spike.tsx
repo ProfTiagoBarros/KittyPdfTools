@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { createTextPdf } from 'pdf-core';
+import { createTextPdf, readPageCount } from 'pdf-core';
 import { extractAllText, configurePdfjs } from 'pdf-core/browser';
 import { createDocumentWorkspace, OperationCancelled } from '@/workers/documents-client';
 
@@ -24,7 +24,8 @@ export interface DocsReport {
   progressEvents: number;
   cancelledAsCancellation: boolean;
   errorForUnknownDocument: string;
-  bytesStayInWorker: boolean;
+  /** Registrar nao le o arquivo: ate um que nao e PDF entra, e quem recusa e a renderizacao. */
+  loadDoesNotRead: boolean;
 }
 
 declare global {
@@ -41,8 +42,8 @@ async function labelled(prefix: string, pages: number): Promise<Uint8Array> {
   );
 }
 
-function transferable(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+function asFile(bytes: Uint8Array): Blob {
+  return new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' });
 }
 
 export default function DocsSpikePage() {
@@ -57,23 +58,29 @@ export default function DocsSpikePage() {
           const a = await labelled('A', 2);
           const b = await labelled('B', 3);
 
-          const bufferA = transferable(a);
-          const pageCountA = await workspace.load('a', bufferA);
-          const pageCountB = await workspace.load('b', transferable(b));
+          await workspace.load('a', asFile(a));
+          await workspace.load('b', asFile(b));
+          const pageCountA = await readPageCount(a);
+          const pageCountB = await readPageCount(b);
 
-          // A transfer list destaca o buffer: prova que os bytes migraram para o worker.
-          const bytesStayInWorker = bufferA.byteLength === 0;
+          let loadDoesNotRead = false;
+          try {
+            await workspace.load('lixo', new Blob(['isto nao e um PDF']));
+            loadDoesNotRead = true;
+          } finally {
+            await workspace.unload('lixo');
+          }
 
           // US-01: paginas de origens diferentes, intercaladas e giradas.
           const composed = await workspace.compose([
             { source: 'b', pageIndex: 2 },
             { source: 'a', pageIndex: 0, rotate: 90 },
           ]);
-          const composedText = await extractAllText(composed);
+          const composedText = await extractAllText(new Uint8Array(await composed.arrayBuffer()));
 
           // US-02: extracao e divisao por intervalo.
           const big = await labelled('C', 20);
-          await workspace.load('c', transferable(big));
+          await workspace.load('c', asFile(big));
           const extracted = await workspace.extract('c', '1-5, 8, 11-15');
           const rangeVolumes = await workspace.splitByRanges('c', '1-5, 8, 11-15');
 
@@ -134,7 +141,7 @@ export default function DocsSpikePage() {
             progressEvents,
             cancelledAsCancellation,
             errorForUnknownDocument,
-            bytesStayInWorker,
+            loadDoesNotRead,
           };
         } finally {
           workspace.dispose();

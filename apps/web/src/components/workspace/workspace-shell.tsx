@@ -11,6 +11,8 @@ import { Dropzone } from './dropzone';
 import { PageGrid } from './page-grid';
 import { SearchField } from './search-field';
 import { canRenderPages } from '@/lib/capabilities';
+import { beginLongOperation } from '@/workspace/long-operation';
+import { LongOperationNotice } from './long-operation-notice';
 
 let documentCounter = 0;
 
@@ -101,21 +103,20 @@ export function WorkspaceShell({
         for (const document of store.getState().documents) handleRemoveDocument(document.id);
       }
 
+      const endLongOperation = beginLongOperation();
       for (const file of files) {
         const documentId = `doc-${(documentCounter += 1)}`;
         try {
-          const original = await file.arrayBuffer();
-
           /*
-           * Cada worker precisa da sua copia — a transfer list DESTACA o buffer enviado —, mas
-           * sao DUAS copias, e nao tres. O original vai inteiro para um worker e so a outra
-           * e fatiada. Antes, o original ficava vivo ao lado de duas fatias: com um PDF de
-           * 150 MB, eram 450 MB so para abrir, e o pico de abertura medido chegava a 1,4 GB.
+           * Os workers recebem o ARQUIVO, e nao os bytes. O `File` do seletor aponta para o
+           * disco e atravessa a fronteira por referencia; cada worker le so quando precisa.
+           *
+           * Antes cada arquivo virava duas copias inteiras na memoria, uma por worker: oito PDFs
+           * escaneados eram 1,17 GB vivos so por estarem abertos, e unir passava de 3 GB — a
+           * tela do app ficava preta.
            */
-          const forDocuments = original.slice(0);
-
-          const pageCount = await services.render.open(documentId, original);
-          await services.documents.load(documentId, forDocuments);
+          const pageCount = await services.render.open(documentId, file);
+          await services.documents.load(documentId, file);
 
           addDocument({ id: documentId, name: file.name, pageCount });
         } catch (cause) {
@@ -127,6 +128,7 @@ export function WorkspaceShell({
         }
       }
 
+      endLongOperation();
       setBusy(false);
     },
     [services, singleDocument, store, handleRemoveDocument, addDocument, t],
@@ -205,6 +207,8 @@ export function WorkspaceShell({
       </div>
 
       <BottomBar>{action}</BottomBar>
+
+      <LongOperationNotice />
 
       {/* Estado somente para os testes observarem sem depender de texto traduzido. */}
       <span

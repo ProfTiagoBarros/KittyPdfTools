@@ -10,8 +10,7 @@
  * COMO USAR (PowerShell), com o app ja compilado:
  *
  *   $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222"
- *   Start-Process apps\desktop\src-tauri	arget
-elease\pdfkitty.exe
+ *   Start-Process apps\desktop\src-tauri\target\release\pdfkitty.exe
  *   pnpm --filter web verify:desktop
  *
  * A porta de depuracao so existe quando essa variavel e definida na sessao que inicia o

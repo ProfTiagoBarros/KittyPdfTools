@@ -57,7 +57,7 @@ export interface DocumentRenderer extends PageRasterizer {
  * grade que rola por centenas de paginas.
  */
 export async function openForRendering(
-  pdf: Uint8Array,
+  pdf: Uint8Array | Blob,
   config: DocumentOptionsConfig = {},
 ): Promise<DocumentRenderer> {
   const task = getDocument(pdfjsDocumentOptions(pdf, config));

@@ -4,7 +4,8 @@ Permite gravar no destino escolhido pelo usuario no seletor do sistema.
 
 #### This default permission set includes the following:
 
-- `allow-save-to-uri`
+- `allow-write-chunk`
+- `allow-finish-write`
 - `allow-copy-saved`
 - `allow-discard-uri`
 
@@ -72,12 +73,12 @@ Denies the discard_uri command without any pre-configured scope.
 <tr>
 <td>
 
-`saf-save:allow-save-to-uri`
+`saf-save:allow-finish-write`
 
 </td>
 <td>
 
-Enables the save_to_uri command without any pre-configured scope.
+Enables the finish_write command without any pre-configured scope.
 
 </td>
 </tr>
@@ -85,12 +86,38 @@ Enables the save_to_uri command without any pre-configured scope.
 <tr>
 <td>
 
-`saf-save:deny-save-to-uri`
+`saf-save:deny-finish-write`
 
 </td>
 <td>
 
-Denies the save_to_uri command without any pre-configured scope.
+Denies the finish_write command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`saf-save:allow-write-chunk`
+
+</td>
+<td>
+
+Enables the write_chunk command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`saf-save:deny-write-chunk`
+
+</td>
+<td>
+
+Denies the write_chunk command without any pre-configured scope.
 
 </td>
 </tr>

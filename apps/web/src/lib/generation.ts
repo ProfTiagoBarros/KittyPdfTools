@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { coreErrorKey, coreErrorParams, useTranslation } from '@/i18n';
+import { beginLongOperation, reportLongOperationProgress } from '@/workspace/long-operation';
 import {
   chooseDestination,
   copySaved,
@@ -25,7 +26,7 @@ import {
  */
 export type LastSource =
   | { readonly kind: 'disk'; readonly path: string }
-  | { readonly kind: 'memory'; readonly bytes: Uint8Array }
+  | { readonly kind: 'memory'; readonly content: Blob }
   | null;
 
 /** Arquivo que a ferramenta acabou de produzir. */
@@ -37,9 +38,20 @@ export interface LastGenerated {
 /** Acima disto, a web nao guarda o arquivo para salvar de novo. */
 const MAX_KEPT_IN_MEMORY = 50 * 1024 * 1024;
 
-function sourceFor(destination: Destination, bytes: Uint8Array): LastSource {
+function sourceFor(destination: Destination, content: Blob): LastSource {
   if (destination.kind === 'system') return { kind: 'disk', path: destination.path };
-  return bytes.length <= MAX_KEPT_IN_MEMORY ? { kind: 'memory', bytes } : null;
+  return content.size <= MAX_KEPT_IN_MEMORY ? { kind: 'memory', content } : null;
+}
+
+/**
+ * Tudo vira `Blob` antes de gravar.
+ *
+ * Unir e extrair ja entregam `Blob`, montado em fluxo e guardado fora da memoria da pagina; as
+ * demais ferramentas entregam bytes. Um tipo so daqui em diante deixa a gravacao em pedacos
+ * igual para todas.
+ */
+function asBlob(content: Uint8Array | Blob): Blob {
+  return content instanceof Blob ? content : new Blob([content as Uint8Array<ArrayBuffer>]);
 }
 
 export interface Generation {
@@ -64,14 +76,17 @@ export interface RunOptions {
   /** Nome sugerido no seletor. O usuario pode trocar. */
   readonly suggestedName: string;
   /**
-   * Produz os bytes do arquivo.
+   * Produz o arquivo: bytes, ou um `Blob` quando foi montado em fluxo fora da memoria da pagina.
    *
    * Recebe uma funcao para relatar progresso — operacoes que nao conseguem estimar podem
    * simplesmente nao chama-la, e a interface mostra atividade sem porcentagem — e o **nome
    * final escolhido pelo usuario**, que a divisao usa para nomear os volumes dentro do
    * pacote.
    */
-  readonly produce: (report: (fraction: number) => void, fileName: string) => Promise<Uint8Array>;
+  readonly produce: (
+    report: (fraction: number) => void,
+    fileName: string,
+  ) => Promise<Uint8Array | Blob>;
   /**
    * Liberacao de memoria em volta da geracao.
    *
@@ -124,6 +139,8 @@ export function useGeneration(): Generation {
 
         setRunning(true);
         setProgress(null);
+        // Depois do destino: o seletor do sistema e do usuario, e nao conta como espera.
+        const endLongOperation = beginLongOperation();
 
         let liberado = false;
         try {
@@ -137,9 +154,14 @@ export function useGeneration(): Generation {
             }
           }
 
-          const bytes = await produce((fraction) => setProgress(fraction), name);
-          await writeTo(destination, bytes);
-          setLast({ name, source: sourceFor(destination, bytes) });
+          const content = asBlob(
+            await produce((fraction) => {
+              setProgress(fraction);
+              reportLongOperationProgress(fraction);
+            }, name),
+          );
+          await writeTo(destination, content);
+          setLast({ name, source: sourceFor(destination, content) });
         } catch (cause) {
           // A causa vai ao console porque a mensagem na tela e traduzida e generica por
           // design; sem ela, "nao foi possivel" e tudo o que se sabe quando o defeito e nosso.
@@ -154,6 +176,7 @@ export function useGeneration(): Generation {
               console.error('Falha ao restaurar as paginas apos gerar', cause);
             });
           }
+          endLongOperation();
           setRunning(false);
           setProgress(null);
         }
@@ -169,7 +192,7 @@ export function useGeneration(): Generation {
     setError(null);
 
     if (source.kind === 'memory') {
-      void savePdf(source.bytes, name).catch((cause: unknown) => {
+      void savePdf(source.content, name).catch((cause: unknown) => {
         console.error('Falha ao salvar novamente', { name }, cause);
         setError(t('save.failed'));
       });

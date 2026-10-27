@@ -2,4 +2,4 @@
 
 [default]
 description = "Permite gravar no destino escolhido pelo usuario no seletor do sistema."
-permissions = ["allow-save-to-uri", "allow-copy-saved", "allow-discard-uri"]
+permissions = ["allow-write-chunk", "allow-finish-write", "allow-copy-saved", "allow-discard-uri"]

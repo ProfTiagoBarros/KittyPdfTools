@@ -216,16 +216,3 @@ export function useWorkspaceStore<T>(selector: (state: WorkspaceState) => T): T 
 export function useWorkspaceStoreApi(): WorkspaceStore {
   return useContext(WorkspaceStoreContext);
 }
-
-/**
- * Todo documento aberto, em qualquer espaco de trabalho.
- *
- * Os workers sao um so para os dois espacos. Quem libera a memoria de TODOS precisa reabrir
- * TODOS: reabrir so os do espaco atual deixaria a grade do outro esperando para sempre por
- * documentos que ninguem devolveu.
- */
-export function openDocumentIds(): string[] {
-  return [sessionStore, splitStore].flatMap((store) =>
-    store.getState().documents.map((document) => document.id),
-  );
-}

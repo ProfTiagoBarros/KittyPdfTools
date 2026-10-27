@@ -10,3 +10,27 @@
     -webkit-text-size-adjust: 100%;
   }
 }
+
+/*
+ * Aviso de operacao demorada: so aparece depois de 1 s. Quem espera e o CSS, e nao um timer
+ * em JavaScript — operacao rapida nao pisca a tela, e a longa nao custa nada enquanto roda.
+ * `visibility: hidden` ate la tambem deixa o painel sem receber clique.
+ */
+.long-operation {
+  visibility: hidden;
+  opacity: 0;
+  animation: long-operation-appear 150ms ease-out 1s forwards;
+}
+
+@keyframes long-operation-appear {
+  to {
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .long-operation {
+    animation-duration: 1ms;
+  }
+}

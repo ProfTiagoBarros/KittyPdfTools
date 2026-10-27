@@ -27,30 +27,122 @@ configurePdfjs(new URL('/pdfjs/', self.location.origin).href);
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
-interface OpenDocument {
-  /*
-   * Sem `bytes`, de proposito: o pdf.js ja guarda o arquivo. Manter uma segunda copia aqui
-   * custava o tamanho inteiro de cada documento aberto — medido, 287 MB com dois arquivos
-   * de 200 paginas. Ofuscar e OCR pedem os bytes com `renderer.getData()` quando rodam.
-   */
-  readonly renderer: DocumentRenderer;
-  /** Texto por pagina, extraido sob demanda na primeira busca e reaproveitado depois. */
-  readonly texts?: readonly string[];
+/** O que o worker sabe de cada documento, aberto ou nao no pdf.js. */
+interface Source {
+  /** O arquivo do seletor: aponta para o disco, e e de onde o documento se reabre. */
+  readonly file: Blob;
+  /** Texto por pagina, extraido na primeira busca. Sobrevive ao documento ser solto. */
+  texts?: readonly string[];
 }
 
-/** Os documentos abertos vivem aqui, e so aqui. A UI conhece apenas identificadores. */
-const documents = new Map<string, OpenDocument>();
+interface OpenDocument {
+  readonly renderer: DocumentRenderer;
+  readonly bytes: number;
+  /** Operacoes usando o documento agora: enquanto houver, ele nao e solto. */
+  inUse: number;
+  /** Fechado ou liberado enquanto estava em uso: solta assim que a ultima operacao terminar. */
+  closing: boolean;
+}
+
+/**
+ * Quanto de documento aberto no pdf.js o worker se permite manter.
+ *
+ * Antes, todo arquivo aberto ficava inteiro aqui ate ser removido — oito PDFs escaneados eram
+ * 551 MB parados, e o mesmo tanto no worker de documentos. Agora fica so o que esta sendo
+ * desenhado, ate este teto; o resto se reabre do arquivo quando a grade rolar ate ele. Um
+ * documento grande sozinho pode passar do teto: o que esta em uso nunca e solto.
+ */
+const OPEN_BUDGET_BYTES = 192 * 1024 * 1024;
+
+const sources = new Map<string, Source>();
+/** Documentos abertos no pdf.js, do menos ao mais recentemente usado. */
+const opened = new Map<string, OpenDocument>();
+const opening = new Map<string, Promise<OpenDocument>>();
 
 function reply(message: RenderResponse, transfer: Transferable[] = []): void {
   scope.postMessage(message, transfer);
 }
 
-function requireDocument(documentId: string): OpenDocument {
-  const open = documents.get(documentId);
-  if (open === undefined) {
-    throw new Error(`Documento '${documentId}' nao esta aberto no worker de renderizacao.`);
+function requireSource(documentId: string): Source {
+  const source = sources.get(documentId);
+  if (source === undefined) {
+    throw new Error(`Documento '${documentId}' nao esta registrado no worker de renderizacao.`);
   }
-  return open;
+  return source;
+}
+
+async function openFromFile(documentId: string): Promise<OpenDocument> {
+  const { file } = requireSource(documentId);
+  // Por faixas: o pdf.js le do arquivo so o que cada pagina precisa. O tamanho do arquivo e o
+  // teto do que ele pode chegar a guardar, e e o que conta no orcamento.
+  const renderer = await openForRendering(file);
+  const document: OpenDocument = { renderer, bytes: file.size, inUse: 0, closing: false };
+  opened.set(documentId, document);
+  return document;
+}
+
+/** Garante o documento aberto e o marca em uso. Todo `acquire` exige um `releaseUse`. */
+async function acquire(documentId: string): Promise<OpenDocument> {
+  const ready = opened.get(documentId);
+  if (ready !== undefined && !ready.closing) {
+    // Reinsere: passa a ser o mais recente, e o ultimo a ser solto.
+    opened.delete(documentId);
+    opened.set(documentId, ready);
+    ready.inUse += 1;
+    return ready;
+  }
+
+  let pending = opening.get(documentId);
+  if (pending === undefined) {
+    pending = openFromFile(documentId).finally(() => opening.delete(documentId));
+    opening.set(documentId, pending);
+  }
+  const document = await pending;
+  // Solto enquanto abria (uma liberacao no meio do caminho): abre de novo, em vez de usar um
+  // documento ja descartado.
+  if (opened.get(documentId) !== document) return acquire(documentId);
+  document.inUse += 1;
+  await trimToBudget();
+  return document;
+}
+
+async function releaseUse(document: OpenDocument): Promise<void> {
+  document.inUse -= 1;
+  if (document.inUse === 0 && document.closing) await document.renderer.dispose();
+}
+
+async function withDocument<T>(
+  documentId: string,
+  work: (renderer: DocumentRenderer) => Promise<T>,
+): Promise<T> {
+  const document = await acquire(documentId);
+  try {
+    return await work(document.renderer);
+  } finally {
+    await releaseUse(document);
+  }
+}
+
+/** Solta o documento agora, ou assim que ninguem mais o estiver usando. */
+async function letGo(documentId: string): Promise<void> {
+  const document = opened.get(documentId);
+  if (document === undefined) return;
+  opened.delete(documentId);
+  if (document.inUse === 0) await document.renderer.dispose();
+  else document.closing = true;
+}
+
+/** Solta os menos usados ate caber no orcamento, sem tocar em quem esta em uso. */
+async function trimToBudget(): Promise<void> {
+  let total = 0;
+  for (const document of opened.values()) total += document.bytes;
+
+  for (const [documentId, document] of [...opened]) {
+    if (total <= OPEN_BUDGET_BYTES) return;
+    if (document.inUse > 0) continue;
+    total -= document.bytes;
+    await letGo(documentId);
+  }
 }
 
 scope.addEventListener('message', (event: MessageEvent<RenderRequest>) => {
@@ -61,30 +153,33 @@ async function handle(request: RenderRequest): Promise<void> {
   try {
     switch (request.kind) {
       case 'open': {
-        // `adopt`: o buffer transferido pela tela vai direto para o pdf.js, sem copia.
-        const renderer = await openForRendering(new Uint8Array(request.bytes), { adopt: true });
-        // Substituir um id ja aberto sem fechar o anterior vazaria o documento do pdf.js.
-        await documents.get(request.documentId)?.renderer.dispose();
-        documents.set(request.documentId, { renderer });
-        reply({
-          kind: 'opened',
-          id: request.id,
-          documentId: request.documentId,
-          pageCount: renderer.pageCount,
-        });
+        // Substituir um id ja aberto sem soltar o anterior vazaria o documento do pdf.js.
+        await letGo(request.documentId);
+        sources.set(request.documentId, { file: request.file });
+        try {
+          // Abrir agora e o que recusa cedo o arquivo que nao e PDF, e conta as paginas.
+          const pageCount = await withDocument(request.documentId, (renderer) =>
+            Promise.resolve(renderer.pageCount),
+          );
+          reply({ kind: 'opened', id: request.id, documentId: request.documentId, pageCount });
+        } catch (error) {
+          sources.delete(request.documentId);
+          throw error;
+        }
         return;
       }
 
       case 'close': {
-        await documents.get(request.documentId)?.renderer.dispose();
-        documents.delete(request.documentId);
+        await letGo(request.documentId);
+        sources.delete(request.documentId);
         reply({ kind: 'closed', id: request.id });
         return;
       }
 
       case 'thumbnail': {
-        const { renderer } = requireDocument(request.documentId);
-        const thumbnail = await renderer.renderThumbnail(request.pageIndex, request.maxEdge);
+        const thumbnail = await withDocument(request.documentId, (renderer) =>
+          renderer.renderThumbnail(request.pageIndex, request.maxEdge),
+        );
         reply(
           {
             kind: 'thumbnail',
@@ -101,30 +196,24 @@ async function handle(request: RenderRequest): Promise<void> {
       }
 
       case 'pageTexts': {
-        const { renderer } = requireDocument(request.documentId);
-
         // Extrai uma vez por documento e guarda. A busca e por digitacao: reextrair a cada
         // tecla faria o pdf.js reinterpretar o documento inteiro a cada letra.
-        const open = requireDocument(request.documentId);
-        if (open.texts === undefined) {
+        const source = requireSource(request.documentId);
+        source.texts ??= await withDocument(request.documentId, async (renderer) => {
           const texts: string[] = [];
           for (let pageIndex = 0; pageIndex < renderer.pageCount; pageIndex += 1) {
             texts.push(await renderer.textOf(pageIndex));
           }
-          documents.set(request.documentId, { ...open, texts });
-        }
-
-        reply({
-          kind: 'pageTexts',
-          id: request.id,
-          texts: documents.get(request.documentId)?.texts ?? [],
+          return texts;
         });
+
+        reply({ kind: 'pageTexts', id: request.id, texts: source.texts });
         return;
       }
 
       case 'release': {
-        for (const open of documents.values()) await open.renderer.dispose();
-        documents.clear();
+        // Os arquivos ficam: cada documento se reabre deles quando for pedido de novo.
+        for (const documentId of [...opened.keys()]) await letGo(documentId);
         reply({ kind: 'released', id: request.id });
         return;
       }
@@ -140,13 +229,13 @@ async function handle(request: RenderRequest): Promise<void> {
       }
 
       case 'redact': {
-        const open = requireDocument(request.documentId);
-        const bytes = await open.renderer.getData();
-        const result = await redactByRasterizing(bytes, request.areas, open.renderer, {
-          ...(request.scale === undefined ? {} : { scale: request.scale }),
-          onProgress: (completed, total) =>
-            reply({ kind: 'progress', id: request.id, completed, total }),
-        });
+        const result = await withDocument(request.documentId, async (renderer) =>
+          redactByRasterizing(await renderer.getData(), request.areas, renderer, {
+            ...(request.scale === undefined ? {} : { scale: request.scale }),
+            onProgress: (completed, total) =>
+              reply({ kind: 'progress', id: request.id, completed, total }),
+          }),
+        );
         const pdf = toTransferable(result);
         reply({ kind: 'redacted', id: request.id, pdf }, [pdf]);
         return;
@@ -247,7 +336,14 @@ async function runCompress(request: CompressRequest): Promise<void> {
 }
 
 async function runOcr(request: Extract<RenderRequest, { kind: 'ocr' }>): Promise<void> {
-  const open = requireDocument(request.documentId);
+  await withDocument(request.documentId, (renderer) => recognize(request, renderer));
+}
+
+async function recognize(
+  request: Extract<RenderRequest, { kind: 'ocr' }>,
+  renderer: DocumentRenderer,
+): Promise<void> {
+  const open = { renderer };
   const targets =
     request.pageIndexes.length > 0
       ? [...request.pageIndexes]
