@@ -145,15 +145,30 @@ export function WorkspaceShell({
         <ToolSidebar />
 
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="flex flex-col gap-3 p-4">
+          <div className="p-4">
             <Dropzone
               onFiles={(files) => void handleFiles(files)}
               busy={busy || services === null}
               multiple={!singleDocument}
             />
-            {/* So aparece com documento carregado: buscar em nada nao e uma acao. */}
-            {documents.length > 0 && <SearchField />}
           </div>
+
+          {/*
+            So aparece com documento carregado: buscar em nada nao e uma acao.
+
+            Fixa no topo ao rolar, por `sticky` e nada mais: sem ouvinte de rolagem, sem
+            container de rolagem proprio, sem medir nada — o navegador resolve na composicao.
+            Fundo solido, e nao `backdrop-blur`: o desfoque cria bloco de contencao e ja tirou
+            dialogo da tela (ver a barra inferior).
+          */}
+          {documents.length > 0 && (
+            <div
+              className="sticky top-0 z-20 border-b border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-950"
+              data-testid="search-bar"
+            >
+              <SearchField />
+            </div>
+          )}
 
           {!canRender && (
             <div

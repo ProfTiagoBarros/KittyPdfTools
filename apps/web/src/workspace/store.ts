@@ -11,6 +11,7 @@ import {
   rotateItems,
   toggleSelected,
 } from './model';
+import type { SearchOutcome } from './search';
 
 /** Teto do historico: guardar tudo faria a memoria crescer sem limite numa sessao longa. */
 const HISTORY_LIMIT = 50;
@@ -45,9 +46,14 @@ export interface WorkspaceState {
   searchTerm: string;
   /** Paginas com pelo menos uma ocorrencia, na chave composta de documento e indice. */
   matchedPages: readonly string[];
+  /** Ocorrencias do termo por pagina de origem, na mesma chave de `matchedPages`. */
+  matchCounts: Readonly<Record<string, number>>;
   /** Quantas paginas carregadas tem texto extraivel; zero sugere documento so de imagem. */
   pagesWithText: number;
-  setSearch: (term: string, matchedPages: readonly string[], pagesWithText: number) => void;
+  setSearch: (term: string, outcome: SearchOutcome) => void;
+  /** Cartao em foco na navegacao entre ocorrencias, pela chave do item. */
+  activeMatch: string | null;
+  setActiveMatch: (key: string | null) => void;
 
   undo: () => void;
   redo: () => void;
@@ -97,6 +103,8 @@ export function createWorkspaceStore(): WorkspaceStore {
       searchTerm: '',
       matchedPages: [],
       pagesWithText: 0,
+      matchCounts: {},
+      activeMatch: null,
 
       addDocument: (document) =>
         commit((state) => ({
@@ -130,8 +138,16 @@ export function createWorkspaceStore(): WorkspaceStore {
 
       // Busca tambem fica fora do historico, pelo mesmo motivo da selecao: desfazer reverte o
       // documento, nao o que o usuario estava procurando.
-      setSearch: (searchTerm, matchedPages, pagesWithText) =>
-        set({ searchTerm, matchedPages, pagesWithText }),
+      // Termo novo, resultado novo: a pagina em foco da busca anterior nao significa mais nada.
+      setSearch: (searchTerm, { matchedPages, occurrences, pagesWithText }) =>
+        set({
+          searchTerm,
+          matchedPages,
+          matchCounts: occurrences,
+          pagesWithText,
+          activeMatch: null,
+        }),
+      setActiveMatch: (activeMatch) => set({ activeMatch }),
 
       undo: () =>
         set((state) => {
@@ -170,6 +186,8 @@ export function createWorkspaceStore(): WorkspaceStore {
           searchTerm: '',
           matchedPages: [],
           pagesWithText: 0,
+          matchCounts: {},
+          activeMatch: null,
         }),
     };
   });

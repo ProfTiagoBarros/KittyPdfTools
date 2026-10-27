@@ -18,6 +18,8 @@ async function attach(page: Page, name: string, pages: number): Promise<void> {
 
 const state = (page: Page) => page.getByTestId('workspace-state');
 const cards = (page: Page) => page.getByTestId('page-card');
+const chaveDe = (page: Page, indice: number) =>
+  cards(page).nth(indice).getAttribute('data-page-key');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/unir/');
@@ -256,6 +258,105 @@ test('limpar a busca remove o destaque', async ({ page }) => {
   await page.getByTestId('search-clear').click();
 
   await expect(cards(page).filter({ has: page.getByTestId('match-badge') })).toHaveCount(0);
+});
+
+test('a busca conta as ocorrencias e navega entre as paginas com o termo', async ({ page }) => {
+  // "P1" esta nas paginas 1 e 10 a 19: onze paginas, uma ocorrencia em cada.
+  await attach(page, 'a.pdf', 20);
+  await expect(cards(page)).toHaveCount(20);
+
+  await page.getByTestId('search-input').fill('P1');
+  await expect(page.getByTestId('search-status')).toContainText(/11 .*11/);
+  // Nada em foco ate o usuario navegar.
+  await expect(page.locator('[data-current-match="true"]')).toHaveCount(0);
+
+  const emFoco = () => page.locator('[data-current-match="true"]');
+
+  await page.getByTestId('search-next').click();
+  await expect(emFoco()).toHaveAttribute('data-page-key', (await chaveDe(page, 0)) ?? '');
+  await expect(page.getByTestId('search-position')).toHaveText(/1 (de|of) 11/);
+
+  await page.getByTestId('search-next').click();
+  await expect(emFoco()).toHaveAttribute('data-page-key', (await chaveDe(page, 9)) ?? '');
+
+  // Voltar da primeira da a volta ate a ultima (P19).
+  await page.getByTestId('search-previous').click();
+  await page.getByTestId('search-previous').click();
+  await expect(emFoco()).toHaveAttribute('data-page-key', (await chaveDe(page, 18)) ?? '');
+  await expect(page.getByTestId('search-position')).toHaveText(/11 (de|of) 11/);
+
+  // Enter avanca, como no "localizar" do navegador.
+  await page.getByTestId('search-input').press('Enter');
+  await expect(emFoco()).toHaveAttribute('data-page-key', (await chaveDe(page, 0)) ?? '');
+
+  // Uma pagina em foco so por vez.
+  await expect(emFoco()).toHaveCount(1);
+});
+
+test('a busca fica a vista ao rolar a grade, e o cartao em foco nao fica sob ela', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 900, height: 700 });
+  await attach(page, 'a.pdf', 40);
+  await expect(cards(page)).toHaveCount(40);
+  await page.getByTestId('search-input').fill('P39');
+  await expect(page.getByTestId('search-next')).toBeVisible();
+
+  await page.mouse.wheel(0, 20_000);
+  await page.waitForFunction(() => window.scrollY > 500);
+
+  // Medido pela posicao, nao por `toBeVisible`: visivel no DOM nao quer dizer dentro da tela.
+  const campo = await page.getByTestId('search-input').boundingBox();
+  expect(campo).not.toBeNull();
+  expect(campo?.y ?? -1).toBeGreaterThanOrEqual(0);
+  expect((campo?.y ?? 0) + (campo?.height ?? 0)).toBeLessThanOrEqual(700);
+
+  // Volta ao topo e navega: o cartao precisa vir para a tela e sair de baixo da barra fixa.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByTestId('search-next').click();
+  const alvo = page.locator('[data-current-match="true"]');
+  await expect(alvo).toBeInViewport();
+  await expect
+    .poll(async () => {
+      const barra = await page.getByTestId('search-bar').boundingBox();
+      const cartao = await alvo.boundingBox();
+      return (cartao?.y ?? 0) >= (barra?.y ?? 0) + (barra?.height ?? 0);
+    })
+    .toBe(true);
+});
+
+test('selecionar marca a pagina com um circulo verde de 1/3 da largura, sem mexer na borda', async ({
+  page,
+}) => {
+  await attach(page, 'a.pdf', 2);
+  await expect(cards(page)).toHaveCount(2);
+  const bordaDe = (indice: number) =>
+    cards(page)
+      .nth(indice)
+      .evaluate((elemento) => getComputedStyle(elemento).borderColor);
+  const bordaAntes = await bordaDe(0);
+
+  await cards(page).first().getByTestId('select-page').click();
+
+  const marca = cards(page).first().getByTestId('selected-mark');
+  await expect(marca).toBeVisible();
+  await expect(cards(page).nth(1).getByTestId('selected-mark')).toHaveCount(0);
+
+  // A borda e da busca; a selecao nao pode mais se confundir com ela.
+  expect(await bordaDe(0)).toBe(bordaAntes);
+
+  const pagina = await cards(page).first().getByTestId('select-page').boundingBox();
+  const circulo = await marca.boundingBox();
+  if (pagina === null || circulo === null) throw new Error('sem caixa para medir');
+
+  expect(Math.abs(circulo.width - pagina.width / 3)).toBeLessThanOrEqual(1);
+  expect(Math.abs(circulo.height - circulo.width)).toBeLessThanOrEqual(1);
+  // Canto inferior esquerdo da pagina.
+  expect(circulo.x - pagina.x).toBeLessThanOrEqual(6);
+  expect(pagina.y + pagina.height - (circulo.y + circulo.height)).toBeLessThanOrEqual(6);
+
+  await cards(page).first().getByTestId('select-page').click();
+  await expect(marca).toHaveCount(0);
 });
 
 test('toda pagina carregada ganha miniatura, e nenhuma fica sem identificacao', async ({

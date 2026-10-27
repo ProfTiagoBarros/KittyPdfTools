@@ -194,3 +194,14 @@ describe('espacos de trabalho separados', () => {
     expect(openDocumentIds().sort()).toEqual(['dividir', 'juntos']);
   });
 });
+
+describe('busca', () => {
+  it('termo novo tira o foco da ocorrencia da busca anterior', () => {
+    state().addDocument(doc('a', 2));
+    state().setActiveMatch(firstKey());
+
+    state().setSearch('outro', { matchedPages: [], occurrences: {}, pagesWithText: 2 });
+
+    expect(state().activeMatch).toBeNull();
+  });
+});

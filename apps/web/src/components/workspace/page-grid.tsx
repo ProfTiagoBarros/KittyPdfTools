@@ -28,6 +28,7 @@ export function PageGrid() {
   const documents = useWorkspaceStore((state) => state.documents);
   const selection = useWorkspaceStore((state) => state.selection);
   const matchedPages = useWorkspaceStore((state) => state.matchedPages);
+  const activeMatch = useWorkspaceStore((state) => state.activeMatch);
   const moveItem = useWorkspaceStore((state) => state.moveItem);
   const toggleSelection = useWorkspaceStore((state) => state.toggleSelection);
   const rotate = useWorkspaceStore((state) => state.rotate);
@@ -102,6 +103,7 @@ export function PageGrid() {
               fileName={nameOf(item.source)}
               selected={selection.includes(item.key)}
               matched={matched.has(pageKey(item.source, item.pageIndex))}
+              currentMatch={item.key === activeMatch}
               canMoveBack={index > 0}
               canMoveForward={index < items.length - 1}
               onMove={(delta) => moveItem(index, index + delta)}

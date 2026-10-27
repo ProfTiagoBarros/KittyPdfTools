@@ -77,7 +77,11 @@ export const en: Messages = {
   'search.placeholder': 'Search for a term...',
   'search.clear': 'Clear search',
   'search.searching': 'Searching...',
-  'search.results': '{count} page(s) with the term',
+  'search.none': 'No page has the term',
+  'search.summary': '{occurrences} match(es) on {pages} page(s)',
+  'search.position': '{current} of {total}',
+  'search.previous': 'Previous page with the term',
+  'search.next': 'Next page with the term',
   'search.noText': 'No page has searchable text. Use OCR to make the document searchable.',
   'bottom.selected': '{count} selected',
 

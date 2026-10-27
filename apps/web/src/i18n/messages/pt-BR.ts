@@ -78,7 +78,11 @@ export const ptBR = {
   'search.placeholder': 'Buscar um termo...',
   'search.clear': 'Limpar busca',
   'search.searching': 'Procurando...',
-  'search.results': '{count} pagina(s) com o termo',
+  'search.none': 'Nenhuma pagina com o termo',
+  'search.summary': '{occurrences} ocorrencia(s) em {pages} pagina(s)',
+  'search.position': '{current} de {total}',
+  'search.previous': 'Pagina anterior com o termo',
+  'search.next': 'Proxima pagina com o termo',
   'search.noText':
     'Nenhuma pagina tem texto pesquisavel. Use o OCR para tornar o documento pesquisavel.',
   'bottom.selected': '{count} selecionada(s)',

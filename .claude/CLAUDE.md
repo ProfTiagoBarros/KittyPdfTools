@@ -183,6 +183,18 @@ distintos. **Destaca, não filtra** — a ordem das páginas é o documento fina
 caixa. Texto extraído uma vez por documento. Palavra partida por kerning escapa; página só de
 imagem não tem texto até o OCR rodar.
 
+Abaixo do campo: **"N ocorrências em M páginas"** e setas ‹ › (Enter / Shift+Enter) que
+navegam **de página em página**, não de ocorrência em ocorrência — a miniatura não mostra onde o
+termo está, e três paradas na mesma página pareceriam setas quebradas. Contagem e navegação
+são **pela grade** (`matchesInGrid`): página excluída não conta, duplicada conta duas vezes. A
+página em foco (`activeMatch`, fora do histórico) ganha anel mais forte e vem ao centro por
+`scrollIntoView`. A barra de busca é **`sticky`** — sem ouvinte de rolagem nem container
+próprio, e com fundo sólido (`backdrop-blur` cria bloco de contenção).
+
+**Seleção ≠ busca.** A busca é dona do contorno (anel âmbar); a seleção é um **círculo verde
+preenchido** no canto inferior esquerdo da miniatura, com **1/3 da largura** dela, e não mexe na
+borda. Eram duas bordas, e uma página selecionada com o termo não dizia qual era qual.
+
 ---
 
 ## Interface: invariantes

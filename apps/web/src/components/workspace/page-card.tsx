@@ -3,6 +3,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -25,6 +26,8 @@ interface PageCardProps {
   readonly selected: boolean;
   /** Pagina com pelo menos uma ocorrencia do termo buscado. */
   readonly matched: boolean;
+  /** A ocorrencia em foco na navegacao da busca. */
+  readonly currentMatch: boolean;
   readonly canMoveBack: boolean;
   readonly canMoveForward: boolean;
   /** -1 move uma posicao para tras, +1 para a frente. */
@@ -43,6 +46,7 @@ export function PageCard({
   fileName,
   selected,
   matched,
+  currentMatch,
   canMoveBack,
   canMoveForward,
   onMove,
@@ -67,13 +71,11 @@ export function PageCard({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        'group relative flex flex-col gap-2 rounded-lg border p-2 transition-colors',
-        selected
-          ? 'border-neutral-900 bg-neutral-100 dark:border-neutral-100 dark:bg-neutral-800'
-          : 'border-neutral-200 dark:border-neutral-800',
-        // O amarelo vem por fora da borda (anel), para nao competir com a borda da selecao:
-        // uma pagina pode estar selecionada E conter o termo ao mesmo tempo.
-        matched && 'ring-2 ring-amber-400 bg-amber-50 dark:bg-amber-950/30',
+        'group relative flex flex-col gap-2 rounded-lg border border-neutral-200 p-2 transition-colors dark:border-neutral-800',
+        // A busca e dona do contorno; a selecao e o circulo verde. Antes as duas eram bordas, e
+        // uma pagina selecionada que tambem continha o termo nao dizia qual das duas coisas era.
+        matched && 'bg-amber-50 ring-2 ring-amber-400 dark:bg-amber-950/30',
+        currentMatch && 'ring-4 ring-amber-500',
         isDragging && 'z-10 opacity-60',
       )}
       data-testid="page-card"
@@ -81,6 +83,7 @@ export function PageCard({
       data-rotate={item.rotate}
       data-selected={selected}
       data-matched={matched}
+      data-current-match={currentMatch}
       {...attributes}
       {...listeners}
     >
@@ -93,7 +96,7 @@ export function PageCard({
         type="button"
         onClick={onToggle}
         data-testid="select-page"
-        className="flex h-32 cursor-grab items-center justify-center overflow-hidden rounded active:cursor-grabbing"
+        className="relative flex h-32 cursor-grab items-center justify-center overflow-hidden rounded active:cursor-grabbing"
         aria-pressed={selected}
         aria-label={accessibleLabel}
       >
@@ -103,6 +106,22 @@ export function PageCard({
           rotate={item.rotate}
           fileName={fileName}
         />
+
+        {/*
+          Selecao: circulo verde no canto inferior esquerdo, com 1/3 da largura da pagina.
+          Grande de proposito — numa grade de centenas de paginas, e o que se procura de longe.
+          O visto dentro dele diz "selecionada" a quem nao distingue o verde; o estado em si
+          vai ao leitor de tela pelo `aria-pressed` do botao.
+        */}
+        {selected && (
+          <span
+            aria-hidden="true"
+            data-testid="selected-mark"
+            className="pointer-events-none absolute bottom-1 left-1 flex aspect-square w-1/3 items-center justify-center rounded-full bg-green-600 text-white shadow-md"
+          >
+            <Check className="size-1/2" strokeWidth={3} />
+          </span>
+        )}
       </button>
 
       {/*
