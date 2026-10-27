@@ -365,14 +365,47 @@ test('trocar de ferramenta preserva os arquivos e as miniaturas', async ({ page 
   await expect(cards(page)).toHaveCount(3);
   await expect(page.getByTestId('thumbnail-placeholder')).toHaveCount(0, { timeout: 20_000 });
 
-  await page.getByRole('link', { name: /dividir|split/i }).click();
-  await expect(page).toHaveURL(/\/dividir\//);
+  await page.getByRole('link', { name: /compactar|compress/i }).click();
+  await expect(page).toHaveURL(/\/compactar\//);
   await expect(state(page)).toHaveAttribute('data-ready', 'true');
 
   // As paginas continuam la...
   await expect(cards(page)).toHaveCount(3);
   // ...e continuam desenhaveis, que e o que o defeito quebrava.
   await expect(page.getByTestId('thumbnail-placeholder')).toHaveCount(0, { timeout: 20_000 });
+});
+
+test('Dividir tem o proprio arquivo e devolve os da sessao intactos', async ({ page }) => {
+  /*
+   * Dividir age sobre um arquivo so, separado dos que estao em "Unir e extrair". Os workers sao
+   * os mesmos, e e ai que mora o risco: dividir solta a memoria de TODOS os documentos e precisa
+   * reabrir TODOS — reabrir so o do Dividir deixaria a grade da sessao esperando para sempre.
+   */
+  await requireOffscreenCanvas(page);
+  await attach(page, 'juntos.pdf', 3);
+  await expect(cards(page)).toHaveCount(3);
+
+  await page.getByRole('link', { name: /dividir|split/i }).click();
+  await expect(page).toHaveURL(/\/dividir\//);
+  await expect(state(page)).toHaveAttribute('data-ready', 'true');
+  await expect(cards(page)).toHaveCount(0);
+
+  await attach(page, 'dividir.pdf', 4);
+  await expect(cards(page)).toHaveCount(4);
+  await page.getByTestId('ranges-input').fill('1-2, 3-4');
+  const download = page.waitForEvent('download', { timeout: 30_000 });
+  await page.getByTestId('split-run').click();
+  await download;
+
+  await page.getByRole('link', { name: /unir|merge/i }).click();
+  await expect(page).toHaveURL(/\/unir\//);
+  await expect(cards(page)).toHaveCount(3);
+  // Pagina nova, nunca desenhada: so aparece se o documento da sessao foi reaberto.
+  await expect(page.getByTestId('thumbnail-placeholder')).toHaveCount(0, { timeout: 20_000 });
+
+  // E o arquivo do Dividir continua la quando se volta.
+  await page.getByRole('link', { name: /dividir|split/i }).click();
+  await expect(cards(page)).toHaveCount(4);
 });
 
 test('o arquivo gerado continua ao alcance para salvar de novo', async ({ page }) => {

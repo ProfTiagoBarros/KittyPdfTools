@@ -69,7 +69,7 @@ publicação na Play ele não pode mudar. `minSdk` **26**, definido em `bundle.a
 
 ```
 apps/web/           Next.js 16 (export estático)
-  src/app/          rota por ferramenta: /unir /extrair /dividir /compactar /ocr /assinar /ofuscar
+  src/app/          rota por ferramenta: /unir /dividir /compactar /ocr /assinar /ofuscar (/extrair → /unir)
   src/components/   ui/ (primitivas) + workspace/ (casca, grade, painel, barra)
   src/workspace/    modelo puro, store Zustand, provedor dos workers, busca
   src/workers/      envelope comum + documentos + renderização + assinatura
@@ -139,10 +139,15 @@ fica **fora** do histórico. Fusão é o caso em que a composição tem todas as
 origens — não existe operação "merge" separada. **Preserva** conteúdo, tamanho e anotações;
 **perde** marcadores e links internos (há teste fixando essa perda).
 
-**Divisão e extração (US-02).** São **duas ferramentas**, porque são dois resultados:
-`/extrair` entrega **um `.pdf`** com as páginas escolhidas; `/dividir` entrega **vários**, sempre
-num `.zip`. Eram modos da mesma tela, e a escolha ficava escondida num grupo de opções — clicar
-"Extrair" só trocava de modo, e nada acontecia. Núcleo: `extractPages` → um documento;
+**Unir e extrair (US-01/02)** é **uma ferramenta** (`/unir`): os dois montam UM PDF a partir da
+grade, e só diferem em quais páginas entram. A escolha é **explícita** — "Todas as páginas"
+(padrão) ou "Só as escolhidas" — porque a seleção da grade também serve para girar e excluir em
+lote: gerar só o selecionado entregaria 3 páginas a quem selecionou 3 para girá-las. `/extrair`
+continua respondendo e redireciona por `<meta refresh>` (o export estático não tem servidor).
+
+**Dividir (US-02)** entrega **vários** arquivos, sempre num `.zip`, e age sobre **um** PDF, **só
+dele**: tem store próprio (`splitStore`), e abrir outro arquivo substitui o atual. Enxergar os
+arquivos da sessão o tornaria outra forma de juntar e recortar. Núcleo: `extractPages` → um documento;
 `splitByRanges` → um por faixa; `splitBySize` → volumes dentro do limite (empacotamento
 incremental, uma geração por página, com progresso e `oversizedPages`). Intervalos são **base 1 na
 entrada e base 0 na saída**, e essa tradução só acontece em `parsePageRanges` / `formatPageRanges`.
@@ -206,7 +211,14 @@ um visualizador de página única). **O provedor de serviços fica fora da casca
 
 **Os workers são da sessão, não da rota.** Trocar de ferramenta preserva arquivos e miniaturas —
 antes destruía os workers e a grade ficava listando páginas sem bytes. Não há confirmação ao
-trocar: a tela foi desenhada em volta de **uma** montagem com cinco ferramentas na lateral.
+trocar: a tela foi desenhada em volta de **uma** montagem com as ferramentas na lateral.
+
+**Dois espaços de trabalho, um par de workers.** O store é criado por fábrica
+(`createWorkspaceStore`) e lido do **contexto** (`useWorkspaceStore(selector)`): a sessão
+(`sessionStore`) é o padrão e o Dividir troca pelo seu (`WorkspaceStoreProvider`). Nenhum
+componente sabe qual é. Os workers são compartilhados — por isso a liberação de memória reabre
+os documentos dos **dois** (`openDocumentIds`): reabrir só os do espaço atual deixaria a grade do
+outro esperando para sempre. Há E2E que divide e volta ao Unir conferindo as miniaturas.
 
 **Lupa em toda página** (`PagePreview`, US-08). A miniatura da grade não responde "que página é
 esta?" — o administrador da escola ordenava um documento longo, gerava o PDF, conferia e voltava
@@ -372,7 +384,7 @@ um build inteiro).
 | ID    | Feature                  | Restrição que não pode ser esquecida                                                      |
 | ----- | ------------------------ | ----------------------------------------------------------------------------------------- |
 | US-01 | Organização de páginas   | Multi-arquivo; mesclar páginas **entre** PDFs; reordenar por arraste **e** por botão      |
-| US-02 | Fusão, divisão, extração | Extrair = 1 arquivo; dividir = vários, em pacote único. Seleção da grade preenche o campo |
+| US-02 | Fusão, divisão, extração | Extrair = 1 arquivo (opção de Unir); dividir = 1 PDF → vários, em pacote. Seleção preenche o campo |
 | US-03 | Ofuscação                | Remover do content stream. Irreversível é requisito jurídico — testar extraindo texto     |
 | US-04 | OCR local                | Tesseract.wasm em worker, PT-BR, barra de progresso obrigatória                           |
 | US-05 | Assinatura ICP-Brasil    | A1 `.pfx` só em memória; chave nunca persistida, logada ou transmitida                    |
@@ -405,7 +417,7 @@ conformidade DOC-ICP-15, via cirúrgica de ofuscação.
 ## Rastreabilidade (antes e depois de toda mudança)
 
 Fonte única: `packages/rastreabilidade/src/matriz.ts` — 13 requisitos (US-01..08, RNF-01..05),
-9 funcionalidades (`F-*`) e 16 componentes (`C-*`), cada um com seus arquivos (por padrão de
+8 funcionalidades (`F-*`) e 16 componentes (`C-*`), cada um com seus arquivos (por padrão de
 caminho), dependências, testes e verificação manual. Visão: `docs/rastreabilidade.html`.
 
 - **Antes de mexer:** ache o componente no mapa e veja quantas funcionalidades ele afeta.

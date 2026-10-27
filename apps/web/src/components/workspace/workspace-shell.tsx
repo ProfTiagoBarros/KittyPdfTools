@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { useWorkspaceStore } from '@/workspace/store';
+import { useWorkspaceStore, useWorkspaceStoreApi } from '@/workspace/store';
 import { useWorkspaceServices } from '@/workspace/services';
 import { useTranslation, type MessageKey } from '@/i18n';
 import { ToolSidebar } from './tool-sidebar';
@@ -27,6 +27,13 @@ interface WorkspaceShellProps {
    * para marcar a regiao certa num documento juridico.
    */
   readonly main?: ReactNode;
+  /**
+   * Um documento por vez: abrir outro SUBSTITUI o atual.
+   *
+   * E o caso do Dividir, que age sobre um arquivo so. Somar um segundo arquivo ali seria juntar
+   * documentos, que e trabalho de "Unir e extrair".
+   */
+  readonly singleDocument?: boolean;
 }
 
 /**
@@ -36,7 +43,13 @@ interface WorkspaceShellProps {
  * Carregar e remover documentos e responsabilidade da casca porque vale para toda ferramenta;
  * o que cada uma FAZ com as paginas entra pelos slots `panel` e `action`.
  */
-export function WorkspaceShell({ titleKey, panel, action, main }: WorkspaceShellProps) {
+export function WorkspaceShell({
+  titleKey,
+  panel,
+  action,
+  main,
+  singleDocument = false,
+}: WorkspaceShellProps) {
   const { t } = useTranslation();
   const services = useWorkspaceServices();
 
@@ -44,6 +57,7 @@ export function WorkspaceShell({ titleKey, panel, action, main }: WorkspaceShell
   const items = useWorkspaceStore((state) => state.items);
   const addDocument = useWorkspaceStore((state) => state.addDocument);
   const removeDocument = useWorkspaceStore((state) => state.removeDocument);
+  const store = useWorkspaceStoreApi();
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,12 +74,32 @@ export function WorkspaceShell({ titleKey, panel, action, main }: WorkspaceShell
     () => true,
   );
 
+  const handleRemoveDocument = useCallback(
+    (documentId: string) => {
+      removeDocument(documentId);
+      void services?.render.close(documentId);
+      void services?.documents.unload(documentId);
+    },
+    [services, removeDocument],
+  );
+
   const handleFiles = useCallback(
-    async (files: readonly File[]) => {
-      if (services === null || files.length === 0) return;
+    async (chosen: readonly File[]) => {
+      if (services === null || chosen.length === 0) return;
+
+      const files = singleDocument ? chosen.slice(0, 1) : chosen;
 
       setBusy(true);
-      setError(null);
+      // Recusar em silencio os arquivos a mais faria o usuario procurar por eles na grade.
+      setError(
+        chosen.length > files.length
+          ? t('workspace.singleDocument.extra', { file: files[0]?.name ?? '' })
+          : null,
+      );
+
+      if (singleDocument) {
+        for (const document of store.getState().documents) handleRemoveDocument(document.id);
+      }
 
       for (const file of files) {
         const documentId = `doc-${(documentCounter += 1)}`;
@@ -95,16 +129,7 @@ export function WorkspaceShell({ titleKey, panel, action, main }: WorkspaceShell
 
       setBusy(false);
     },
-    [services, addDocument, t],
-  );
-
-  const handleRemoveDocument = useCallback(
-    (documentId: string) => {
-      removeDocument(documentId);
-      void services?.render.close(documentId);
-      void services?.documents.unload(documentId);
-    },
-    [services, removeDocument],
+    [services, singleDocument, store, handleRemoveDocument, addDocument, t],
   );
 
   return (
@@ -124,6 +149,7 @@ export function WorkspaceShell({ titleKey, panel, action, main }: WorkspaceShell
             <Dropzone
               onFiles={(files) => void handleFiles(files)}
               busy={busy || services === null}
+              multiple={!singleDocument}
             />
             {/* So aparece com documento carregado: buscar em nada nao e uma acao. */}
             {documents.length > 0 && <SearchField />}
@@ -144,6 +170,7 @@ export function WorkspaceShell({ titleKey, panel, action, main }: WorkspaceShell
           {error !== null && (
             <p
               role="alert"
+              data-testid="workspace-error"
               className="mx-4 rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
             >
               {error}

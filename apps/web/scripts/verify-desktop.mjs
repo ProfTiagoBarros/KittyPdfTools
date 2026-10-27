@@ -289,7 +289,9 @@ const habilitado = (testId) =>
   );
 
 // EXTRAIR: o defeito relatado era selecionar paginas e nada acontecer.
-const cartoesExtrair = await abrirComPdf('/extrair/', 6);
+// Extrair e a opcao "so as escolhidas" de "Unir e extrair".
+const cartoesExtrair = await abrirComPdf('/unir/', 6);
+await page.click('[data-testid="pages-some"]');
 const ligacao = await page.evaluate(async () => {
   const cartoes = [...document.querySelectorAll('[data-testid="page-card"]')];
   // Pelo `data-testid` do botao de selecao: `querySelector('button')` pegava o primeiro
@@ -304,7 +306,7 @@ console.log(
   'EXTRAIR  :',
   `${cartoesExtrair} cartoes | clicando 3 paginas -> campo=${JSON.stringify(ligacao)}`,
   ligacao === '1-3' ? '| a grade escreve no campo' : '| O CAMPO NAO ACOMPANHOU',
-  (await habilitado('extract-run')) ? '| acao liberada' : '| ACAO BLOQUEADA',
+  (await habilitado('export')) ? '| acao liberada' : '| ACAO BLOQUEADA',
 );
 
 // DIVIDIR: duas faixas encostadas, que a selecao sozinha nao saberia representar.

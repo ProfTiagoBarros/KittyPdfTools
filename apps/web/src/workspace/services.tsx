@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { createRenderWorkspace, type RenderWorkspace } from '@/workers/render-client';
 import { createDocumentWorkspace, type DocumentWorkspace } from '@/workers/documents-client';
 import type { GenerationAround } from '@/lib/generation';
-import { useWorkspaceStore } from './store';
+import { openDocumentIds } from './store';
 
 export interface WorkspaceServices {
   /** Miniaturas e ofuscacao. Detem os documentos abertos no pdf.js. */
@@ -89,9 +89,8 @@ export function usePageMemoryRelease(): GenerationAround | undefined {
     return {
       before: () => services.render.release(),
       after: () =>
-        services.render.restore(
-          useWorkspaceStore.getState().documents.map((document) => document.id),
-          (documentId) => services.documents.copyOf(documentId),
+        services.render.restore(openDocumentIds(), (documentId) =>
+          services.documents.copyOf(documentId),
         ),
     };
   }, [services]);

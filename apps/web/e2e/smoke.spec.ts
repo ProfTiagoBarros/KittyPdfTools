@@ -1,14 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const TOOL_SLUGS = [
-  'unir',
-  'extrair',
-  'dividir',
-  'compactar',
-  'ocr',
-  'assinar',
-  'ofuscar',
-] as const;
+const TOOL_SLUGS = ['unir', 'dividir', 'compactar', 'ocr', 'assinar', 'ofuscar'] as const;
 
 test('a home lista todas as ferramentas', async ({ page }) => {
   await page.goto('/');
@@ -53,7 +45,7 @@ test.describe('deteccao de idioma do navegador', () => {
 
     test('mantem a interface em portugues', async ({ page }) => {
       await page.goto('/unir/');
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Unir');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Unir e extrair');
     });
   });
 
@@ -62,7 +54,7 @@ test.describe('deteccao de idioma do navegador', () => {
 
     test('troca a interface para ingles sem recarregar', async ({ page }) => {
       await page.goto('/unir/');
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Merge');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Merge and extract');
     });
 
     test('o HTML estatico entregue continua em pt-BR', async ({ request }) => {

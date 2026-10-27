@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useWorkspaceStore } from './store';
+import { createWorkspaceStore, openDocumentIds, sessionStore, splitStore } from './store';
 
 const doc = (id: string, pageCount: number) => ({ id, name: `${id}.pdf`, pageCount });
-const state = () => useWorkspaceStore.getState();
+const state = () => sessionStore.getState();
 const keys = () => state().items.map((item) => item.key);
 const pages = () => state().items.map((item) => `${item.source}:${item.pageIndex}`);
 const firstKey = () => {
@@ -154,5 +154,43 @@ describe('desfazer e refazer', () => {
   it('o historico tem teto, para nao crescer sem limite', () => {
     for (let round = 0; round < 80; round += 1) state().rotate([firstKey()], 90);
     expect(state().past.length).toBeLessThanOrEqual(50);
+  });
+});
+
+describe('espacos de trabalho separados', () => {
+  beforeEach(() => splitStore.getState().reset());
+
+  it('o arquivo do Dividir nao aparece na sessao, nem o contrario', () => {
+    state().addDocument(doc('juntos', 2));
+    splitStore.getState().addDocument(doc('dividir', 5));
+
+    expect(state().documents.map((d) => d.id)).toEqual(['juntos']);
+    expect(splitStore.getState().documents.map((d) => d.id)).toEqual(['dividir']);
+  });
+
+  it('desfazer num espaco nao mexe no outro', () => {
+    state().addDocument(doc('a', 2));
+    splitStore.getState().addDocument(doc('b', 2));
+
+    splitStore.getState().undo();
+
+    expect(splitStore.getState().items).toHaveLength(0);
+    expect(state().items).toHaveLength(2);
+  });
+
+  it('as chaves nao colidem entre espacos', () => {
+    const outro = createWorkspaceStore();
+    state().addDocument(doc('a', 3));
+    outro.getState().addDocument(doc('b', 3));
+
+    const todas = [...keys(), ...outro.getState().items.map((item) => item.key)];
+    expect(new Set(todas).size).toBe(6);
+  });
+
+  it('quem reabre documentos depois de liberar a memoria enxerga os dois espacos', () => {
+    state().addDocument(doc('juntos', 1));
+    splitStore.getState().addDocument(doc('dividir', 1));
+
+    expect(openDocumentIds().sort()).toEqual(['dividir', 'juntos']);
   });
 });

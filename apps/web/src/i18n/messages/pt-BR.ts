@@ -13,12 +13,11 @@ export const ptBR = {
   'nav.home': 'Inicio',
   'nav.tools': 'Ferramentas',
 
-  'tool.merge.name': 'Unir',
-  'tool.merge.description': 'Combine varios PDFs em um unico documento.',
+  'tool.merge.name': 'Unir e extrair',
+  'tool.merge.description':
+    'Junte varios PDFs, organize as paginas e gere um documento com todas ou so as escolhidas.',
   'tool.split.name': 'Dividir',
-  'tool.split.description': 'Quebre um documento em varios arquivos, por faixa ou por tamanho.',
-  'tool.extract.name': 'Extrair',
-  'tool.extract.description': 'Recorte as paginas escolhidas para um unico arquivo.',
+  'tool.split.description': 'Quebre um PDF em varios arquivos, por faixa ou por tamanho.',
   'tool.compress.name': 'Compactar',
   'tool.compress.description': 'Reduza o tamanho do arquivo, com ou sem perda de qualidade.',
   'tool.ocr.name': 'OCR',
@@ -31,6 +30,9 @@ export const ptBR = {
   'workspace.dropzone.title': 'Arraste PDFs aqui',
   'workspace.dropzone.hint': 'Os arquivos ficam no seu computador. Nada e enviado.',
   'workspace.dropzone.button': 'Escolher arquivos',
+  'workspace.dropzone.title.single': 'Arraste um PDF aqui',
+  'workspace.dropzone.button.single': 'Escolher arquivo',
+  'workspace.singleDocument.extra': 'Esta ferramenta trabalha com um arquivo por vez: abri {file}.',
   'workspace.empty': 'Nenhuma pagina ainda.',
   'workspace.loading': 'Lendo arquivo...',
   'workspace.pageLabel': 'Pagina {number}',
@@ -89,6 +91,8 @@ export const ptBR = {
     'Arquivo grande demais para guardar na memoria do navegador. Gere de novo para outra copia.',
   'generation.saveAgain': 'Ultimo arquivo gerado — clique para salvar de novo',
 
+  'split.ownFile':
+    'Dividir trabalha com um arquivo so, separado dos que estao abertos em Unir e extrair.',
   'split.mode': 'Modo de divisao',
   'split.mode.ranges': 'Por intervalo',
   'split.mode.ranges.hint': 'Um arquivo para cada faixa.',
@@ -147,12 +151,13 @@ export const ptBR = {
   'compress.confirm.cancel': 'Cancelar',
   'compress.confirm.accept': 'Compactar mesmo assim',
 
-  'extract.pages': 'Paginas a extrair',
-  'extract.pages.label': 'Paginas',
-  'extract.explanation':
-    'Gera UM arquivo com as paginas escolhidas, na ordem em que forem pedidas.',
-  'extract.run': 'Extrair',
-  'extract.running': 'Extraindo...',
+  'merge.pages': 'Paginas do PDF',
+  'merge.pages.all': 'Todas as paginas',
+  'merge.pages.all.hint': 'A grade inteira, na ordem em que esta.',
+  'merge.pages.some': 'So as escolhidas',
+  'merge.pages.some.hint': 'Digite as paginas ou clique nas miniaturas.',
+  'merge.pages.label': 'Paginas',
+  'merge.extract': 'Gerar PDF com as escolhidas',
 
   'coreError.unknown': 'Algo deu errado. Tente novamente.',
   'coreError.EMPTY_COMPOSITION': 'Nao ha paginas para gerar o documento.',

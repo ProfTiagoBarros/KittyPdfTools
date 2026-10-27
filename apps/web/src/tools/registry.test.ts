@@ -3,10 +3,9 @@ import { TOOLS, findTool, getTool } from '@/tools/registry';
 import { ptBR } from '@/i18n/messages/pt-BR';
 
 describe('registro de ferramentas', () => {
-  it('cobre as ferramentas do backlog, com extrair separada de dividir', () => {
+  it('cobre as ferramentas do backlog, com extrair dentro de unir', () => {
     expect(TOOLS.map((tool) => tool.slug)).toEqual([
       'unir',
-      'extrair',
       'dividir',
       'compactar',
       'ocr',

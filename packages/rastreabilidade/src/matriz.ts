@@ -182,7 +182,8 @@ const componentes: readonly Componente[] = [
   {
     id: 'C-ESTADO',
     nome: 'Estado da composicao',
-    descricao: 'Modelo puro da grade e store Zustand: paginas, selecao, historico de desfazer.',
+    descricao:
+      'Modelo puro da grade e stores Zustand por contexto: o da sessao e o proprio do Dividir, com paginas, selecao e desfazer.',
     arquivos: [`${WEB}/workspace/model.ts`, `${WEB}/workspace/store.ts`],
     usa: [],
     testes: testes([`${WEB}/workspace/store.test.ts`]),
@@ -262,7 +263,7 @@ const componentes: readonly Componente[] = [
     usa: ['C-NUCLEO', 'C-ESTADO', 'C-I18N'],
     testes: testes(
       [`${CORE}/split/page-ranges.test.ts`, `${WEB}/workspace/__tests__/page-spec.test.ts`],
-      ['extract.spec.ts', 'split.spec.ts'],
+      ['merge.spec.ts', 'split.spec.ts'],
     ),
     requisitos: ['US-02'],
     verificacaoManual: [],
@@ -373,34 +374,29 @@ const FERRAMENTA = ['C-CASCA', 'C-GRADE', 'C-ESTADO', 'C-SERVICOS', 'C-GERACAO',
 const funcionalidades: readonly Funcionalidade[] = [
   {
     id: 'F-UNIR',
-    nome: 'Unir e organizar',
+    nome: 'Unir e extrair',
     rota: '/unir/',
-    descricao: 'Junta paginas de varios PDFs, reordena, gira, duplica, exclui e desfaz.',
-    arquivos: [`${WEB}/app/unir/**`, `${WEB}/components/workspace/organize-tool.tsx`],
-    usa: [...FERRAMENTA, 'C-DOCUMENTOS', 'C-COMPOSICAO'],
-    testes: testes([], ['workspace.spec.ts']),
+    descricao:
+      'Junta paginas de varios PDFs, reordena, gira, duplica, exclui e desfaz; gera UM PDF com todas as paginas ou so com as escolhidas. /extrair/ redireciona para ca.',
+    arquivos: [
+      `${WEB}/app/unir/**`,
+      `${WEB}/app/extrair/**`,
+      `${WEB}/components/workspace/organize-tool.tsx`,
+    ],
+    usa: [...FERRAMENTA, 'C-INTERVALOS', 'C-DOCUMENTOS', 'C-COMPOSICAO'],
+    testes: testes([], ['merge.spec.ts', 'workspace.spec.ts']),
     requisitos: ['US-01', 'US-02', 'RNF-03'],
     verificacaoManual: [
-      'verify:desktop -> CARREGAR, SELETOR, ARQUIVO',
-      'verify:android -> UNIR SELETOR/ARQUIVO/INTEGRO, REABRIR',
+      'verify:desktop -> CARREGAR, SELETOR, ARQUIVO, EXTRAIR',
+      'verify:android -> UNIR SELETOR/ARQUIVO/INTEGRO, REABRIR, LIGACAO, EXTRAIR CONTEUDO',
     ],
-  },
-  {
-    id: 'F-EXTRAIR',
-    nome: 'Extrair',
-    rota: '/extrair/',
-    descricao: 'Recorta as paginas escolhidas para UM arquivo PDF.',
-    arquivos: [`${WEB}/app/extrair/**`, `${WEB}/components/workspace/extract-tool.tsx`],
-    usa: [...FERRAMENTA, 'C-INTERVALOS', 'C-DOCUMENTOS', 'C-COMPOSICAO'],
-    testes: testes([], ['extract.spec.ts']),
-    requisitos: ['US-02'],
-    verificacaoManual: ['verify:desktop -> EXTRAIR', 'verify:android -> LIGACAO, EXTRAIR CONTEUDO'],
   },
   {
     id: 'F-DIVIDIR',
     nome: 'Dividir',
     rota: '/dividir/',
-    descricao: 'Quebra o documento em varios arquivos, por faixa ou por tamanho, num pacote .zip.',
+    descricao:
+      'Quebra UM PDF, aberto so nesta ferramenta, em varios arquivos por faixa ou por tamanho, num pacote .zip.',
     arquivos: [
       `${WEB}/app/dividir/**`,
       `${WEB}/components/workspace/split-tool.tsx`,
@@ -409,7 +405,7 @@ const funcionalidades: readonly Funcionalidade[] = [
     usa: [...FERRAMENTA, 'C-INTERVALOS', 'C-DOCUMENTOS', 'C-COMPOSICAO', 'C-NUCLEO'],
     testes: testes(
       [`${CORE}/split/split.test.ts`, `${CORE}/split/archive.test.ts`],
-      ['split.spec.ts'],
+      ['split.spec.ts', 'workspace.spec.ts'],
     ),
     requisitos: ['US-02'],
     verificacaoManual: ['verify:desktop -> DIVIDIR', 'verify:android -> DIVIDIR CONTEUDO'],

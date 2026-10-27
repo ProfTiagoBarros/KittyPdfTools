@@ -6,7 +6,7 @@ import { useTranslation, type MessageKey } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { packVolumes, volumeNames } from 'pdf-core';
 import { toPageRefs } from '@/workspace/model';
-import { useWorkspaceStore } from '@/workspace/store';
+import { splitStore, useWorkspaceStore, WorkspaceStoreProvider } from '@/workspace/store';
 import {
   usePageMemoryRelease,
   useWorkspaceServices,
@@ -31,8 +31,8 @@ interface ModeOption {
 /**
  * Cada modo produz um resultado diferente, entao o nome diz o resultado, nao a tecnica.
  *
- * Recortar para um arquivo so nao esta aqui: virou a ferramenta "Extrair". Dividir sempre
- * entrega varios arquivos — e por isso sempre entrega um pacote.
+ * Recortar para um arquivo so nao esta aqui: e "Unir e extrair". Dividir sempre entrega varios
+ * arquivos — e por isso sempre entrega um pacote.
  */
 const MODES = [
   { id: 'ranges', labelKey: 'split.mode.ranges', hintKey: 'split.mode.ranges.hint' },
@@ -153,6 +153,10 @@ function SplitPanel() {
 
   return (
     <section className="flex flex-col gap-3">
+      <p className="text-sm text-neutral-500" data-testid="split-own-file">
+        {t('split.ownFile')}
+      </p>
+
       <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
         {t('split.mode')}
       </h2>
@@ -249,18 +253,28 @@ function SplitAction() {
   );
 }
 
+/**
+ * Dividir age sobre UM arquivo, e esse arquivo e so dele.
+ *
+ * Os workers sao os da sessao, mas o espaco de trabalho e outro: os arquivos abertos em "Unir e
+ * extrair" nao aparecem aqui, e o que se abre aqui nao aparece la. Somar varios arquivos para
+ * dividir seria juntar e recortar — o que a ferramenta ao lado ja faz.
+ */
 export function SplitTool() {
   return (
     // O provedor de servicos vem por fora: o SplitProvider consome os workers, entao
     // precisa estar dentro dele.
     <WorkspaceServicesProvider>
-      <SplitProvider>
-        <WorkspaceShell
-          titleKey={getTool('dividir').nameKey}
-          panel={<SplitPanel />}
-          action={<SplitAction />}
-        />
-      </SplitProvider>
+      <WorkspaceStoreProvider value={splitStore}>
+        <SplitProvider>
+          <WorkspaceShell
+            titleKey={getTool('dividir').nameKey}
+            panel={<SplitPanel />}
+            action={<SplitAction />}
+            singleDocument
+          />
+        </SplitProvider>
+      </WorkspaceStoreProvider>
     </WorkspaceServicesProvider>
   );
 }

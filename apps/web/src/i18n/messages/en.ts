@@ -13,12 +13,11 @@ export const en: Messages = {
   'nav.home': 'Home',
   'nav.tools': 'Tools',
 
-  'tool.merge.name': 'Merge',
-  'tool.merge.description': 'Combine several PDFs into a single document.',
+  'tool.merge.name': 'Merge and extract',
+  'tool.merge.description':
+    'Combine PDFs, arrange the pages and build one document with all or only the chosen pages.',
   'tool.split.name': 'Split',
-  'tool.split.description': 'Break one document into several files, by range or by size.',
-  'tool.extract.name': 'Extract',
-  'tool.extract.description': 'Cut the chosen pages into a single file.',
+  'tool.split.description': 'Break one PDF into several files, by range or by size.',
   'tool.compress.name': 'Compress',
   'tool.compress.description': 'Shrink the file, with or without losing quality.',
   'tool.ocr.name': 'OCR',
@@ -31,6 +30,9 @@ export const en: Messages = {
   'workspace.dropzone.title': 'Drop PDFs here',
   'workspace.dropzone.hint': 'Files stay on your computer. Nothing is uploaded.',
   'workspace.dropzone.button': 'Choose files',
+  'workspace.dropzone.title.single': 'Drop a PDF here',
+  'workspace.dropzone.button.single': 'Choose file',
+  'workspace.singleDocument.extra': 'This tool works on one file at a time: opened {file}.',
   'workspace.empty': 'No pages yet.',
   'workspace.loading': 'Reading file...',
   'workspace.pageLabel': 'Page {number}',
@@ -87,6 +89,8 @@ export const en: Messages = {
     'File too large to keep in the browser memory. Generate again for another copy.',
   'generation.saveAgain': 'Last generated file — click to save it again',
 
+  'split.ownFile':
+    'Split works on a single file, kept apart from the ones open in Merge and extract.',
   'split.mode': 'Split mode',
   'split.mode.ranges': 'By range',
   'split.mode.ranges.hint': 'One file per range.',
@@ -145,12 +149,13 @@ export const en: Messages = {
   'compress.confirm.cancel': 'Cancel',
   'compress.confirm.accept': 'Compress anyway',
 
-  'extract.pages': 'Pages to extract',
-  'extract.pages.label': 'Pages',
-  'extract.explanation':
-    'Produces ONE file with the chosen pages, in the order they are asked for.',
-  'extract.run': 'Extract',
-  'extract.running': 'Extracting...',
+  'merge.pages': 'Pages in the PDF',
+  'merge.pages.all': 'All pages',
+  'merge.pages.all.hint': 'The whole grid, in its current order.',
+  'merge.pages.some': 'Only the chosen ones',
+  'merge.pages.some.hint': 'Type the pages or click the thumbnails.',
+  'merge.pages.label': 'Pages',
+  'merge.extract': 'Build PDF from chosen pages',
 
   'coreError.unknown': 'Something went wrong. Please try again.',
   'coreError.EMPTY_COMPOSITION': 'There are no pages to build the document.',

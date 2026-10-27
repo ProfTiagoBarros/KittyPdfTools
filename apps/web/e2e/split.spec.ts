@@ -89,6 +89,41 @@ test('US-02 — dividir por tamanho produz varios volumes', async ({ page }) => 
   await expect(page.getByTestId('split-results')).toContainText(String(Object.keys(pacote).length));
 });
 
+test('trabalha com um arquivo por vez: abrir outro substitui o atual', async ({ page }) => {
+  await attach(page, 'a.pdf', 4);
+  await expect(cards(page)).toHaveCount(4);
+
+  await attach(page, 'b.pdf', 2);
+
+  await expect(cards(page)).toHaveCount(2);
+  await expect(state(page)).toHaveAttribute('data-documents', '1');
+});
+
+test('varios arquivos arrastados de uma vez: abre o primeiro e diz isso', async ({ page }) => {
+  // O seletor daqui ja nao aceita varios; arrastar da area de trabalho do sistema, aceita.
+  const arquivos: [nome: string, conteudo: string][] = [
+    ['a.pdf', minimalPdf(3)],
+    ['b.pdf', minimalPdf(2)],
+  ];
+  const arrastados = await page.evaluateHandle(
+    (lista) => {
+      const transferencia = new DataTransfer();
+      for (const [nome, conteudo] of lista) {
+        const bytes = Uint8Array.from(conteudo, (c) => c.charCodeAt(0));
+        transferencia.items.add(new File([bytes], nome, { type: 'application/pdf' }));
+      }
+      return transferencia;
+    },
+    arquivos,
+  );
+  await page.getByTestId('dropzone').dispatchEvent('drop', { dataTransfer: arrastados });
+
+  await expect(cards(page)).toHaveCount(3);
+  await expect(state(page)).toHaveAttribute('data-documents', '1');
+  // Recusar em silencio faria o usuario procurar o segundo arquivo na grade.
+  await expect(page.getByTestId('workspace-error')).toContainText('a.pdf');
+});
+
 test('a divisao age sobre a composicao, nao sobre o arquivo original', async ({ page }) => {
   await attach(page, 'a.pdf', 4);
   await expect(cards(page)).toHaveCount(4);

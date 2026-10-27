@@ -3,7 +3,7 @@
 > Gerado de `packages/rastreabilidade/src/matriz.ts` por `pnpm rastreabilidade`. **Nao edite a mao.**
 > Versao visual: [`rastreabilidade.html`](rastreabilidade.html).
 
-**13** requisitos · **9** funcionalidades · **16** componentes · **25** testes unitarios · **12** specs E2E · **1** suites nativas
+**13** requisitos · **8** funcionalidades · **16** componentes · **25** testes unitarios · **12** specs E2E · **1** suites nativas
 
 ## Como usar
 
@@ -21,31 +21,31 @@ algum teste impactado falhar.
 `●` usa diretamente · `○` usa por meio de outro componente. Mexer numa linha exige os testes de
 todas as colunas marcadas nela.
 
-| Componente | UNIR | EXTRAIR | DIVIDIR | COMPACTAR | OCR | ASSINAR | OFUSCAR | BUSCA | LUPA | Afeta |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `C-NUCLEO` | ○ | ○ | ● | ● | ● | ○ | ● | ○ | ○ | 9 |
-| `C-COMPOSICAO` | ● | ● | ● | ● | ○ | ○ | ○ | ○ | ○ | 9 |
-| `C-VERIFICACAO` |  |  |  |  |  |  | ● |  |  | 1 |
-| `C-MENSAGENS` | ○ | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ | 9 |
-| `C-RENDERIZACAO` | ○ | ○ | ○ | ● | ● | ○ | ● | ● | ● | 9 |
-| `C-DOCUMENTOS` | ● | ● | ● | ● | ○ | ○ | ○ | ○ | ○ | 9 |
-| `C-ESTADO` | ● | ● | ● | ● | ● | ● | ● | ● | ● | 9 |
-| `C-I18N` | ● | ● | ● | ● | ● | ● | ● | ● | ● | 9 |
-| `C-GERACAO` | ● | ● | ● | ● | ● | ● | ● | ○ | ○ | 9 |
-| `C-SERVICOS` | ● | ● | ● | ● | ● | ● | ● | ● | ● | 9 |
-| `C-INTERVALOS` |  | ● | ● |  |  |  |  |  |  | 2 |
-| `C-GRADE` | ● | ● | ● | ● | ● | ● | ● | ● | ● | 9 |
-| `C-CASCA` | ● | ● | ● | ● | ● | ● | ● |  |  | 7 |
-| `C-PROTOTIPOS` |  |  |  |  |  |  |  |  |  | 0 |
-| `C-PLATAFORMA` |  |  |  |  |  |  |  |  |  | 0 |
-| `C-RASTREABILIDADE` |  |  |  |  |  |  |  |  |  | 0 |
+| Componente | UNIR | DIVIDIR | COMPACTAR | OCR | ASSINAR | OFUSCAR | BUSCA | LUPA | Afeta |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `C-NUCLEO` | ○ | ● | ● | ● | ○ | ● | ○ | ○ | 8 |
+| `C-COMPOSICAO` | ● | ● | ● | ○ | ○ | ○ | ○ | ○ | 8 |
+| `C-VERIFICACAO` |  |  |  |  |  | ● |  |  | 1 |
+| `C-MENSAGENS` | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ | 8 |
+| `C-RENDERIZACAO` | ○ | ○ | ● | ● | ○ | ● | ● | ● | 8 |
+| `C-DOCUMENTOS` | ● | ● | ● | ○ | ○ | ○ | ○ | ○ | 8 |
+| `C-ESTADO` | ● | ● | ● | ● | ● | ● | ● | ● | 8 |
+| `C-I18N` | ● | ● | ● | ● | ● | ● | ● | ● | 8 |
+| `C-GERACAO` | ● | ● | ● | ● | ● | ● | ○ | ○ | 8 |
+| `C-SERVICOS` | ● | ● | ● | ● | ● | ● | ● | ● | 8 |
+| `C-INTERVALOS` | ● | ● |  |  |  |  |  |  | 2 |
+| `C-GRADE` | ● | ● | ● | ● | ● | ● | ● | ● | 8 |
+| `C-CASCA` | ● | ● | ● | ● | ● | ● |  |  | 6 |
+| `C-PROTOTIPOS` |  |  |  |  |  |  |  |  | 0 |
+| `C-PLATAFORMA` |  |  |  |  |  |  |  |  | 0 |
+| `C-RASTREABILIDADE` |  |  |  |  |  |  |  |  | 0 |
 
 ## Requisitos
 
 | Requisito | Atendido por | Restricao |
 | --- | --- | --- |
 | **US-01** Organizacao de paginas | `F-UNIR` `C-GRADE` | Multi-arquivo; mesclar paginas ENTRE PDFs; reordenar por arraste E por botao. |
-| **US-02** Fusao, divisao e extracao | `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `C-INTERVALOS` | Extrair entrega 1 arquivo; dividir entrega varios num pacote; a selecao da grade preenche o campo. |
+| **US-02** Fusao, divisao e extracao | `F-UNIR` `F-DIVIDIR` `C-INTERVALOS` | Extrair entrega 1 arquivo; dividir entrega varios num pacote; a selecao da grade preenche o campo. |
 | **US-03** Ofuscacao | `F-OFUSCAR` | Remover do content stream, irreversivel. Retangulo preto nao e ofuscacao. |
 | **US-04** OCR local | `F-OCR` | Tesseract em worker, PT-BR, barra de progresso obrigatoria. |
 | **US-05** Assinatura ICP-Brasil | `F-ASSINAR` | A1 .pfx so em memoria; chave nunca persistida, logada ou transmitida. |
@@ -60,37 +60,26 @@ todas as colunas marcadas nela.
 
 ## Funcionalidades
 
-### `F-UNIR` Unir e organizar
+### `F-UNIR` Unir e extrair
 
-Junta paginas de varios PDFs, reordena, gira, duplica, exclui e desfaz.
+Junta paginas de varios PDFs, reordena, gira, duplica, exclui e desfaz; gera UM PDF com todas as paginas ou so com as escolhidas. /extrair/ redireciona para ca.
 
 - **Rota:** `/unir/`
 - **Requisitos:** US-01, US-02, RNF-03
-- **Usa:** `C-CASCA` `C-GRADE` `C-ESTADO` `C-SERVICOS` `C-GERACAO` `C-I18N` `C-DOCUMENTOS` `C-COMPOSICAO`
-- **Arquivos:** `apps/web/src/app/unir/**`, `apps/web/src/components/workspace/organize-tool.tsx`
-- **Testes:** E2E `workspace.spec.ts`
-- **Verificacao manual:** verify:desktop -> CARREGAR, SELETOR, ARQUIVO; verify:android -> UNIR SELETOR/ARQUIVO/INTEGRO, REABRIR
-
-### `F-EXTRAIR` Extrair
-
-Recorta as paginas escolhidas para UM arquivo PDF.
-
-- **Rota:** `/extrair/`
-- **Requisitos:** US-02
 - **Usa:** `C-CASCA` `C-GRADE` `C-ESTADO` `C-SERVICOS` `C-GERACAO` `C-I18N` `C-INTERVALOS` `C-DOCUMENTOS` `C-COMPOSICAO`
-- **Arquivos:** `apps/web/src/app/extrair/**`, `apps/web/src/components/workspace/extract-tool.tsx`
-- **Testes:** E2E `extract.spec.ts`
-- **Verificacao manual:** verify:desktop -> EXTRAIR; verify:android -> LIGACAO, EXTRAIR CONTEUDO
+- **Arquivos:** `apps/web/src/app/unir/**`, `apps/web/src/app/extrair/**`, `apps/web/src/components/workspace/organize-tool.tsx`
+- **Testes:** E2E `merge.spec.ts`, E2E `workspace.spec.ts`
+- **Verificacao manual:** verify:desktop -> CARREGAR, SELETOR, ARQUIVO, EXTRAIR; verify:android -> UNIR SELETOR/ARQUIVO/INTEGRO, REABRIR, LIGACAO, EXTRAIR CONTEUDO
 
 ### `F-DIVIDIR` Dividir
 
-Quebra o documento em varios arquivos, por faixa ou por tamanho, num pacote .zip.
+Quebra UM PDF, aberto so nesta ferramenta, em varios arquivos por faixa ou por tamanho, num pacote .zip.
 
 - **Rota:** `/dividir/`
 - **Requisitos:** US-02
 - **Usa:** `C-CASCA` `C-GRADE` `C-ESTADO` `C-SERVICOS` `C-GERACAO` `C-I18N` `C-INTERVALOS` `C-DOCUMENTOS` `C-COMPOSICAO` `C-NUCLEO`
 - **Arquivos:** `apps/web/src/app/dividir/**`, `apps/web/src/components/workspace/split-tool.tsx`, `packages/pdf-core/src/split/{split.ts,archive.ts,index.ts}`
-- **Testes:** unitario `split.test.ts`, unitario `archive.test.ts`, E2E `split.spec.ts`
+- **Testes:** unitario `split.test.ts`, unitario `archive.test.ts`, E2E `split.spec.ts`, E2E `workspace.spec.ts`
 - **Verificacao manual:** verify:desktop -> DIVIDIR; verify:android -> DIVIDIR CONTEUDO
 
 ### `F-COMPACTAR` Compactar
@@ -162,7 +151,7 @@ Abre a pagina a 1400 px, navega com setas e move/gira de dentro.
 Taxonomia de erros por codigo, a API publica do pdf-core, geometria, cessao do laco de eventos e fixtures.
 
 - **Requisitos:** RNF-05
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `packages/pdf-core/src/errors.ts`, `packages/pdf-core/src/index.ts`, `packages/pdf-core/src/geometry.ts`, `packages/pdf-core/src/async.ts`, `packages/pdf-core/src/fixtures.ts`
 - **Testes:** unitario `core-errors.test.ts`
 
@@ -172,7 +161,7 @@ Materializa a lista de paginas num PDF, carregando uma origem por vez.
 
 - **Requisitos:** RNF-03
 - **Usa:** `C-NUCLEO`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `packages/pdf-core/src/composition/**`
 - **Testes:** unitario `build.test.ts`
 
@@ -191,7 +180,7 @@ Formato comum das mensagens dos workers, transporte de erros por codigo e de buf
 
 - **Requisitos:** RNF-02
 - **Usa:** `C-NUCLEO`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `apps/web/src/workers/messages.ts`
 - **Testes:** unitario `messages.test.ts`
 
@@ -201,7 +190,7 @@ Worker que desenha paginas, extrai texto, rasteriza e orquestra ofuscar, OCR e c
 
 - **Requisitos:** RNF-02, RNF-03, RNF-04
 - **Usa:** `C-MENSAGENS` `C-NUCLEO`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `apps/web/src/workers/render-client.ts`, `apps/web/src/workers/render-protocol.ts`, `apps/web/src/workers/render.worker.ts`, `packages/pdf-core/src/browser/index.ts`, `packages/pdf-core/src/browser/pdfjs-setup.ts`, `packages/pdf-core/src/browser/renderer.ts`, `packages/pdf-core/scripts/copy-pdfjs-assets.mjs`
 - **Testes:** E2E `workspace.spec.ts`, E2E `preview.spec.ts`
 - **Verificacao manual:** verify:desktop -> CARREGAR, LUPA; verify:android -> CARREGAR, LUPA
@@ -212,15 +201,15 @@ Dono dos bytes de cada arquivo aberto: compoe, extrai e divide.
 
 - **Requisitos:** RNF-02, RNF-03
 - **Usa:** `C-MENSAGENS` `C-COMPOSICAO` `C-NUCLEO`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `apps/web/src/workers/documents-client.ts`, `apps/web/src/workers/documents-protocol.ts`, `apps/web/src/workers/documents.worker.ts`
 - **Testes:** E2E `documents-worker.spec.ts`
 
 ### `C-ESTADO` Estado da composicao
 
-Modelo puro da grade e store Zustand: paginas, selecao, historico de desfazer.
+Modelo puro da grade e stores Zustand por contexto: o da sessao e o proprio do Dividir, com paginas, selecao e desfazer.
 
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `apps/web/src/workspace/model.ts`, `apps/web/src/workspace/store.ts`
 - **Testes:** unitario `store.test.ts`
 
@@ -230,7 +219,7 @@ Dicionarios, deteccao de idioma e traducao de erros do nucleo.
 
 - **Requisitos:** RNF-05
 - **Usa:** `C-NUCLEO`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `apps/web/src/i18n/core-errors.ts`, `apps/web/src/i18n/index.ts`, `apps/web/src/i18n/locale-hydrator.tsx`, `apps/web/src/i18n/messages/**`, `apps/web/src/i18n/registry.ts`, `apps/web/src/i18n/store.ts`, `apps/web/src/i18n/use-translation.ts`
 - **Testes:** unitario `core-errors.test.ts`, unitario `registry.test.ts`, unitario `use-translation.test.tsx`
 
@@ -240,7 +229,7 @@ Destino antes de gerar, progresso, ultima geracao, gravacao pelo plugin proprio 
 
 - **Requisitos:** RNF-03
 - **Usa:** `C-I18N` `C-NUCLEO`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `apps/web/src/lib/generation.ts`, `apps/web/src/lib/save-pdf.ts`, `apps/web/src/components/workspace/generation-action.tsx`, `apps/desktop/plugins/saf-save/src/**`, `apps/desktop/plugins/saf-save/android/src/**`, `apps/desktop/plugins/saf-save/android/{build.gradle.kts,settings.gradle,consumer-rules.pro}`, `apps/desktop/plugins/saf-save/{Cargo.toml,build.rs}`, `apps/desktop/plugins/saf-save/permissions/default.toml`
 - **Testes:** unitario `save-pdf.test.ts`, unitario `generation.test.tsx`, E2E `workspace.spec.ts`, nativo `apps/desktop/plugins/saf-save/Cargo.toml`
 - **Verificacao manual:** verify:desktop -> ARQUIVO (seletor Salvar como); verify:android -> UNIR SELETOR/ARQUIVO/INTEGRO (gravacao pelo SAF)
@@ -251,7 +240,7 @@ Cria os workers uma vez por sessao e solta as paginas da renderizacao durante op
 
 - **Requisitos:** RNF-03
 - **Usa:** `C-RENDERIZACAO` `C-DOCUMENTOS` `C-ESTADO` `C-GERACAO`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `apps/web/src/workspace/services.tsx`
 - **Testes:** E2E `workspace.spec.ts`, E2E `preview.spec.ts`
 
@@ -261,9 +250,9 @@ Gramatica `1-3, 7-8` (base 1 na entrada, base 0 na saida) e o vinculo de mao dup
 
 - **Requisitos:** US-02
 - **Usa:** `C-NUCLEO` `C-ESTADO` `C-I18N`
-- **Mexer aqui afeta:** `F-EXTRAIR` `F-DIVIDIR`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR`
 - **Arquivos:** `packages/pdf-core/src/split/page-ranges.ts`, `apps/web/src/workspace/page-spec.ts`, `apps/web/src/components/workspace/page-range-field.tsx`
-- **Testes:** unitario `page-ranges.test.ts`, unitario `page-spec.test.ts`, E2E `extract.spec.ts`, E2E `split.spec.ts`
+- **Testes:** unitario `page-ranges.test.ts`, unitario `page-spec.test.ts`, E2E `merge.spec.ts`, E2E `split.spec.ts`
 
 ### `C-GRADE` Grade de paginas e miniaturas
 
@@ -271,7 +260,7 @@ Cartoes reordenaveis, miniaturas sob demanda e nunca vazias, desenho com rotacao
 
 - **Requisitos:** US-01, RNF-03
 - **Usa:** `C-ESTADO` `C-SERVICOS` `C-I18N`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR` `F-BUSCA` `F-LUPA`
 - **Arquivos:** `apps/web/src/components/workspace/page-grid.tsx`, `apps/web/src/components/workspace/page-card.tsx`, `apps/web/src/components/workspace/page-thumbnail.tsx`, `apps/web/src/lib/draw-page.ts`
 - **Testes:** unitario `page-thumbnail.test.tsx`, E2E `workspace.spec.ts`
 - **Verificacao manual:** verify:android -> LUPA ALVO (alvo de toque de 44 px)
@@ -282,7 +271,7 @@ Layout, pagina inicial, barra lateral, area de arquivos, barra inferior com area
 
 - **Requisitos:** RNF-01
 - **Usa:** `C-GRADE` `C-SERVICOS` `C-ESTADO` `C-I18N`
-- **Mexer aqui afeta:** `F-UNIR` `F-EXTRAIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR`
+- **Mexer aqui afeta:** `F-UNIR` `F-DIVIDIR` `F-COMPACTAR` `F-OCR` `F-ASSINAR` `F-OFUSCAR`
 - **Arquivos:** `apps/web/src/app/layout.tsx`, `apps/web/src/app/page.tsx`, `apps/web/src/app/globals.css`, `apps/web/src/components/workspace/workspace-shell.tsx`, `apps/web/src/components/workspace/tool-sidebar.tsx`, `apps/web/src/components/workspace/bottom-bar.tsx`, `apps/web/src/components/workspace/dropzone.tsx`, `apps/web/src/components/workspace/properties-panel.tsx`, `apps/web/src/components/ui/**`, `apps/web/src/tools/registry.ts`, `apps/web/src/lib/capabilities.ts`, `apps/web/src/lib/cn.ts`
 - **Testes:** unitario `registry.test.ts`, E2E `smoke.spec.ts`, E2E `workspace.spec.ts`
 - **Verificacao manual:** verify:desktop -> CAPACIDADES, WORKERS; verify:android -> AREA SEG (barra inferior acima da area do sistema)

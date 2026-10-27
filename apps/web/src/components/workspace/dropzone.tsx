@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button';
 interface DropzoneProps {
   readonly onFiles: (files: readonly File[]) => void;
   readonly busy: boolean;
+  /** Falso onde a ferramenta trabalha com um arquivo por vez. */
+  readonly multiple?: boolean;
 }
 
-export function Dropzone({ onFiles, busy }: DropzoneProps) {
+export function Dropzone({ onFiles, busy, multiple = true }: DropzoneProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -55,21 +57,25 @@ export function Dropzone({ onFiles, busy }: DropzoneProps) {
       data-testid="dropzone"
     >
       <Upload className="size-6 text-neutral-400" aria-hidden="true" />
-      <p className="font-medium">{t('workspace.dropzone.title')}</p>
+      <p className="font-medium">
+        {t(multiple ? 'workspace.dropzone.title' : 'workspace.dropzone.title.single')}
+      </p>
       {/* A promessa de privacidade aparece no momento em que o arquivo entra, nao no rodape. */}
       <p className="text-sm text-emerald-700 dark:text-emerald-400">
         {t('workspace.dropzone.hint')}
       </p>
 
       <Button onClick={() => inputRef.current?.click()} disabled={busy}>
-        {busy ? t('workspace.loading') : t('workspace.dropzone.button')}
+        {busy
+          ? t('workspace.loading')
+          : t(multiple ? 'workspace.dropzone.button' : 'workspace.dropzone.button.single')}
       </Button>
 
       <input
         ref={inputRef}
         type="file"
         accept="application/pdf"
-        multiple
+        multiple={multiple}
         className="sr-only"
         data-testid="file-input"
         onChange={(event) => {

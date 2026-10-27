@@ -616,7 +616,9 @@ async function contarPaginasDe(caminho) {
 }
 
 // --- EXTRAIR ---------------------------------------------------------------
-const cartoesExtrair = await abrirComPdf('/extrair/', 6);
+// Extrair e a opcao "so as escolhidas" de "Unir e extrair".
+const cartoesExtrair = await abrirComPdf('/unir/', 6);
+await page.click('[data-testid="pages-some"]');
 console.log('EXTRAIR  :', `rota carregou, ${cartoesExtrair} cartao(oes) na grade`);
 
 // O defeito relatado pelo usuario: selecionar paginas na grade e mandar extrair nao fazia
@@ -634,7 +636,7 @@ const ligacao = await page.evaluate(async () => {
   return {
     campo: document.querySelector('[data-testid="extract-ranges-input"]')?.value ?? null,
     marcadas: document.querySelectorAll('[data-testid="page-card"][data-selected="true"]').length,
-    acaoLiberada: document.querySelector('[data-testid="extract-run"]')?.disabled === false,
+    acaoLiberada: document.querySelector('[data-testid="export"]')?.disabled === false,
   };
 });
 console.log(
@@ -646,7 +648,7 @@ console.log(
 );
 
 const salvoExtrair = await salvarPeloSeletor('pdfkitty-extraido.pdf', () =>
-  page.click('[data-testid="extract-run"]'),
+  page.click('[data-testid="export"]'),
 );
 relatar('EXTRAIR', salvoExtrair, 'pdf');
 

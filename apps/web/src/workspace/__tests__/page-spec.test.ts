@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { PdfCoreError } from 'pdf-core';
 import { usePageSpec } from '../page-spec';
-import { useWorkspaceStore } from '../store';
+import { sessionStore } from '../store';
 
 /**
  * O campo de intervalos e a selecao da grade sao a mesma escolha vista de dois jeitos.
@@ -13,18 +13,18 @@ import { useWorkspaceStore } from '../store';
  */
 
 function carregar(paginas: number): void {
-  useWorkspaceStore.getState().addDocument({ id: 'doc', name: 'a.pdf', pageCount: paginas });
+  sessionStore.getState().addDocument({ id: 'doc', name: 'a.pdf', pageCount: paginas });
 }
 
 /** Chave do item na posicao informada, do jeito que a grade a passaria ao clicar. */
 function chave(posicao: number): string {
-  const item = useWorkspaceStore.getState().items[posicao];
+  const item = sessionStore.getState().items[posicao];
   if (item === undefined) throw new Error(`sem item na posicao ${posicao}`);
   return item.key;
 }
 
 beforeEach(() => {
-  useWorkspaceStore.getState().reset();
+  sessionStore.getState().reset();
 });
 
 describe('usePageSpec', () => {
@@ -36,7 +36,7 @@ describe('usePageSpec', () => {
 
     act(() => {
       for (const posicao of [0, 1, 2, 6]) {
-        useWorkspaceStore.getState().toggleSelection(chave(posicao));
+        sessionStore.getState().toggleSelection(chave(posicao));
       }
     });
 
@@ -51,7 +51,7 @@ describe('usePageSpec', () => {
     act(() => result.current.setSpec('5-8'));
 
     expect(result.current.indices).toEqual([4, 5, 6, 7]);
-    expect(useWorkspaceStore.getState().selection).toEqual([
+    expect(sessionStore.getState().selection).toEqual([
       chave(4),
       chave(5),
       chave(6),
@@ -78,7 +78,7 @@ describe('usePageSpec', () => {
     expect(result.current.spec).toBe('1-3');
 
     // Um clique numa pagina e uma intencao nova: o campo volta a espelhar a grade.
-    act(() => useWorkspaceStore.getState().toggleSelection(chave(6)));
+    act(() => sessionStore.getState().toggleSelection(chave(6)));
 
     expect(result.current.spec).toBe('1-3, 7');
   });
@@ -146,7 +146,7 @@ describe('usePageSpec', () => {
 
       act(() => {
         for (const posicao of [0, 1, 4]) {
-          useWorkspaceStore.getState().toggleSelection(chave(posicao));
+          sessionStore.getState().toggleSelection(chave(posicao));
         }
       });
 
@@ -170,7 +170,7 @@ describe('usePageSpec', () => {
 
       act(() => result.current.setSpec('1-3, 4-6'));
       // Um clique por fora abandona o rascunho: a fronteira digitada deixa de valer.
-      act(() => useWorkspaceStore.getState().toggleSelection(chave(0)));
+      act(() => sessionStore.getState().toggleSelection(chave(0)));
 
       expect(result.current.resolvedSpec).toBe('2-6');
     });
@@ -184,7 +184,7 @@ describe('usePageSpec', () => {
     act(() => result.current.setSpec(''));
 
     expect(result.current.indices).toEqual([]);
-    expect(useWorkspaceStore.getState().selection).toEqual([]);
+    expect(sessionStore.getState().selection).toEqual([]);
   });
 
   it('sai do estado de erro quando o texto volta a ser valido', () => {

@@ -13,7 +13,6 @@ export interface ToolDefinition {
  */
 export const TOOLS = [
   { slug: 'unir', nameKey: 'tool.merge.name', descriptionKey: 'tool.merge.description' },
-  { slug: 'extrair', nameKey: 'tool.extract.name', descriptionKey: 'tool.extract.description' },
   { slug: 'dividir', nameKey: 'tool.split.name', descriptionKey: 'tool.split.description' },
   { slug: 'compactar', nameKey: 'tool.compress.name', descriptionKey: 'tool.compress.description' },
   { slug: 'ocr', nameKey: 'tool.ocr.name', descriptionKey: 'tool.ocr.description' },
